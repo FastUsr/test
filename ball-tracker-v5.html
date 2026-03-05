@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ball Tracker v5</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{min-height:100dvh;background:#08080d;color:#e0e0e6;font-family:'JetBrains Mono','SF Mono',monospace;padding:14px;overflow-x:hidden}
+
+  .hdr{text-align:center;margin-bottom:14px}
+  .hdr .tag{font-size:8px;letter-spacing:4px;color:#00ffaa;text-transform:uppercase;opacity:.6;margin-bottom:3px}
+  .hdr h1{font-size:22px;font-weight:700;letter-spacing:-1px;font-family:'Space Grotesk',sans-serif;background:linear-gradient(135deg,#fff,#00ffaa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hdr .sub{font-size:8px;color:#444;margin-top:2px}
+
+  .hud{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+  .hc{background:linear-gradient(145deg,#0e0e16,#0b0b12);border:1px solid #1a1a2e;border-radius:12px;padding:8px 14px;text-align:center;min-width:68px;transition:all .3s}
+  .hc.m{padding:10px 24px;border-color:#1a2a22}
+  .hc.m.a{box-shadow:0 0 30px rgba(0,255,170,.12);border-color:#00ffaa44}
+  .hl2{font-size:6px;color:#555;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:1px}
+  .hv{font-size:14px;font-weight:600;color:#444;line-height:1;font-family:'Space Grotesk',sans-serif;transition:color .2s}
+  .hc.m .hv{font-size:40px;font-weight:700}
+  .hv.g{color:#00ffaa}.hv.y{color:#ffaa00}.hv.c{color:#44aaff}
+  .hu{font-size:7px;color:#3a3a4e;margin-top:1px}
+
+  .cb{max-width:520px;margin:0 auto 10px;padding:0 4px}
+  .cbg{height:4px;background:#111;border-radius:4px;overflow:hidden}
+  .cbf{height:100%;border-radius:4px;transition:width .3s,background .3s;width:0%}
+  .cbl{display:flex;justify-content:space-between;margin-bottom:2px}
+  .cbl span{font-size:7px;color:#555;letter-spacing:1px;text-transform:uppercase}
+  .cbl .cv{font-size:8px;color:#00ffaa}
+
+  .roi-status{max-width:520px;margin:0 auto 10px;text-align:center;font-size:9px;padding:6px 10px;border-radius:8px;border:1px solid #1a1a2e;background:#0e0e16}
+  .roi-status.found{border-color:#00ffaa33;color:#00ffaa}
+  .roi-status.missing{border-color:#ff444433;color:#ff6666}
+
+  .btn{display:block;margin:0 auto 12px;padding:13px 34px;background:linear-gradient(135deg,#00ffaa,#00cc88);color:#08080d;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Space Grotesk',sans-serif;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 20px rgba(0,255,170,.3)}
+  .btn:active{transform:scale(.97)}
+  .err{background:#1a0a0a;border:1px solid #ff4444;border-radius:10px;padding:10px;text-align:center;color:#ff6666;font-size:11px;margin-bottom:10px}
+
+  .cw{position:relative;border-radius:12px;overflow:hidden;border:1px solid #1a1a2e;background:#000;margin:0 auto 10px;max-width:520px}
+  .cw canvas{width:100%;display:block}
+  .bd{position:absolute;top:5px;left:5px;background:rgba(0,0,0,.75);border-radius:4px;padding:2px 6px;display:flex;align-items:center;gap:3px}
+  .ld{width:5px;height:5px;border-radius:50%;background:#ff3333;animation:p 1.5s ease infinite}
+  .bd span{font-size:7px;color:#ccc}
+  .fb{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.75);border-radius:4px;padding:2px 6px}
+  .fb span{font-size:7px;color:#ffaa00}
+  .ia{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#333;font-size:10px;min-height:160px}
+
+  .dw{border-radius:12px;overflow:hidden;border:1px solid #1a1a2e;background:#000;margin:0 auto 10px;max-width:520px;display:none;position:relative}
+  .dw.s{display:block}
+  .dw canvas{width:100%;display:block}
+
+  .gw{max-width:520px;margin:0 auto 10px;background:#0e0e16;border:1px solid #1a1a2e;border-radius:12px;padding:12px;display:none}
+  .gw.s{display:block}
+  .gw canvas{width:100%;height:55px;display:block;border-radius:5px}
+  .gt{font-size:7px;letter-spacing:2px;color:#444;text-transform:uppercase;margin-bottom:6px}
+
+  .ct{background:#0e0e16;border:1px solid #1a1a2e;border-radius:12px;padding:14px;max-width:520px;margin:0 auto 10px}
+  .ct-t{font-size:7px;letter-spacing:2.5px;color:#444;text-transform:uppercase;margin-bottom:10px;border-bottom:1px solid #151520;padding-bottom:5px}
+  .sg{margin-bottom:8px}
+  .sh{display:flex;justify-content:space-between;margin-bottom:1px}
+  .sl{font-size:8px;color:#6a6f78;text-transform:uppercase;letter-spacing:.5px}
+  .sv{font-size:9px;color:#00ffaa}
+  input[type=range]{width:100%;height:4px;-webkit-appearance:none;background:#1a1a2e;border-radius:4px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#00ffaa;cursor:pointer;box-shadow:0 0 8px rgba(0,255,170,.4)}
+  .br{display:flex;gap:5px;margin-top:10px;flex-wrap:wrap}
+  .tb{flex:1;min-width:55px;padding:8px 5px;border-radius:8px;border:1px solid #2a2a3e;background:transparent;color:#555;cursor:pointer;font-size:8px;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:.2px;transition:all .2s;text-align:center}
+  .tb.on{border-color:#00ffaa;background:rgba(0,255,170,.08);color:#00ffaa}
+  .tb.db{border-color:#ffaa00;background:rgba(255,170,0,.08);color:#ffaa00}
+  .tb.st{border-color:#ff4444;background:rgba(255,68,68,.08);color:#ff4444}
+
+  .bp{max-width:520px;margin:0 auto 10px;background:#0e0e16;border:1px solid #1a1a2e;border-radius:12px;padding:10px 14px;display:none}
+  .bp.s{display:block}
+  .bpt{font-size:7px;letter-spacing:2px;color:#444;text-transform:uppercase;margin-bottom:6px}
+  .bl{display:flex;flex-wrap:wrap;gap:4px}
+  .bi{background:#0a0a12;border:1px solid #1a2a22;border-radius:6px;padding:3px 7px;font-size:8px;white-space:nowrap}
+  .bi .id{color:#00ffaa}.bi .sp{color:#333;margin:0 2px}.bi .v{color:#666}
+
+  .ti{max-width:520px;margin:0 auto;color:#2a2a3e;font-size:8px;line-height:1.4;text-align:center;padding-bottom:16px}
+  .ti b{color:#00ffaa}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="tag">◉ CV + AUTO ROI</div>
+  <h1>BALL TRACKER v5</h1>
+  <div class="sub">Détection automatique du cercle noir · Tracking prédictif · Anti-hallucinations</div>
+</div>
+
+<div class="hud">
+  <div class="hc"><div class="hl2">BRUT</div><div class="hv" id="hRaw">0</div><div class="hu">blobs</div></div>
+  <div class="hc m" id="hMainC"><div class="hl2">ESTIMATION</div><div class="hv" id="hEst">0</div><div class="hu" id="hEstU">boules</div></div>
+  <div class="hc"><div class="hl2">CONFIRMÉES</div><div class="hv" id="hConf">0</div><div class="hu">actives</div></div>
+  <div class="hc"><div class="hl2">FPS</div><div class="hv" id="hFps">0</div><div class="hu">frame/s</div></div>
+</div>
+
+<div class="cb"><div class="cbl"><span>Confiance</span><span class="cv" id="cPct">—</span></div><div class="cbg"><div class="cbf" id="cBar"></div></div></div>
+
+<div class="roi-status missing" id="roiSt">ROI : en attente — pointe vers le cercle noir</div>
+
+<button class="btn" id="startBtn" onclick="go()">▶ ACTIVER LA CAMÉRA</button>
+<div class="err" id="errBox" style="display:none"></div>
+<video id="vid" playsinline muted autoplay style="display:none"></video>
+
+<div class="cw">
+  <canvas id="mC"></canvas>
+  <div class="bd" id="lBd" style="display:none"><div class="ld"></div><span>LIVE</span></div>
+  <div class="ia" id="ia">Caméra inactive</div>
+</div>
+
+<div class="dw" id="dW"><canvas id="dC"></canvas><div class="bd"><span style="color:#ffaa00">MASQUE DANS ROI</span></div></div>
+
+<div class="gw s">
+  <div class="gt">📊 ESTIMATION TEMPS RÉEL</div>
+  <canvas id="gC" height="55"></canvas>
+</div>
+
+<div class="ct">
+  <div class="ct-t">⚙ PARAMÈTRES</div>
+  <div class="sg"><div class="sh"><span class="sl">Seuil blanc</span><span class="sv" id="p1">215</span></div>
+    <input type="range" min="120" max="255" value="215" oninput="P.thresh=+this.value;$('p1').textContent=this.value"></div>
+  <div class="sg"><div class="sh"><span class="sl">Seuil noir (ROI)</span><span class="sv" id="p9">55</span></div>
+    <input type="range" min="15" max="120" value="55" oninput="P.darkThresh=+this.value;$('p9').textContent=this.value"></div>
+  <div class="sg"><div class="sh"><span class="sl">Circularité min</span><span class="sv" id="p2">0.50</span></div>
+    <input type="range" min="20" max="90" value="50" oninput="P.circ=+this.value/100;$('p2').textContent=P.circ.toFixed(2)"></div>
+  <div class="sg"><div class="sh"><span class="sl">Taille min blob</span><span class="sv" id="p3">35</span></div>
+    <input type="range" min="5" max="400" value="35" oninput="P.minB=+this.value;$('p3').textContent=this.value"></div>
+  <div class="sg"><div class="sh"><span class="sl">Frames confirmation</span><span class="sv" id="p5">5</span></div>
+    <input type="range" min="2" max="25" value="5" oninput="P.confF=+this.value;$('p5').textContent=this.value"></div>
+  <div class="sg"><div class="sh"><span class="sl">Fenêtre estimation</span><span class="sv" id="p6">50</span></div>
+    <input type="range" min="10" max="200" step="5" value="50" oninput="P.win=+this.value;$('p6').textContent=this.value"></div>
+  <div class="sg"><div class="sh"><span class="sl">Distance tracking</span><span class="sv" id="p7">30</span></div>
+    <input type="range" min="5" max="120" value="30" oninput="P.baseDist=+this.value;$('p7').textContent=this.value"></div>
+  <div class="sg"><div class="sh"><span class="sl">Résolution</span><span class="sv" id="p8">320</span></div>
+    <input type="range" min="160" max="480" step="10" value="320" oninput="P.res=+this.value;$('p8').textContent=this.value"></div>
+  <div class="br">
+    <button class="tb" id="bDbg" onclick="tDbg()">○ DEBUG</button>
+    <button class="tb on" id="bMrg" onclick="tMrg()">◉ MERGE</button>
+    <button class="tb on" id="bRoi" onclick="tRoi()">◉ AUTO ROI</button>
+    <button class="tb st" id="bStop" onclick="stop()" style="display:none">■ STOP</button>
+  </div>
+</div>
+
+<div class="bp" id="bP"><div class="bpt">BOULES CONFIRMÉES</div><div class="bl" id="bL"></div></div>
+
+<div class="ti">
+  <b>v5 :</b> Détecte le <b>cercle noir</b> automatiquement et ignore tout le reste.
+  Seuls les blobs blancs <b>à l'intérieur</b> du cercle sont analysés. Merge détecté par ratio d'aire médiane.
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const vid=$('vid'),mC=$('mC'),dC=$('dC'),gC=$('gC');
+const mx=mC.getContext('2d',{willReadFrequently:true});
+const dx=dC.getContext('2d');
+const gx=gC.getContext('2d');
+
+const P={thresh:215,darkThresh:55,circ:0.50,minB:35,maxB:20000,confF:5,win:50,baseDist:30,res:320,mrgDet:true,autoRoi:true};
+let on=false,dbg=false,pGray=null,aId=null;
+
+// ROI state
+let roi=null; // {cx,cy,r} detected dark circle
+let roiSmooth=null; // smoothed ROI
+const ROI_ALPHA=0.15; // smoothing
+
+// Tracking
+let trk=[];
+let nId=1;
+let medArea=0; // learned single ball area
+let areaHist=[];
+const histEst=[];
+const MH=500;
+let fn=0,ft=performance.now(),fv=0;
+
+async function go(){
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+    vid.srcObject=s;await vid.play();
+    on=true;pGray=null;trk=[];nId=1;medArea=0;areaHist=[];histEst.length=0;roi=null;roiSmooth=null;
+    $('startBtn').style.display='none';$('bStop').style.display='';
+    $('lBd').style.display='flex';$('ia').style.display='none';$('errBox').style.display='none';
+    ft=performance.now();fn=0;
+    requestAnimationFrame(loop);
+  }catch(e){$('errBox').style.display='block';$('errBox').textContent=e.message}
+}
+function stop(){
+  on=false;if(vid.srcObject){vid.srcObject.getTracks().forEach(t=>t.stop());vid.srcObject=null}
+  if(aId)cancelAnimationFrame(aId);pGray=null;
+  $('startBtn').style.display='';$('bStop').style.display='none';
+  $('lBd').style.display='none';$('ia').style.display='flex';
+}
+function tDbg(){dbg=!dbg;$('bDbg').className=dbg?'tb db':'tb';$('bDbg').textContent=(dbg?'◉':'○')+' DEBUG';$('dW').className=dbg?'dw s':'dw'}
+function tMrg(){P.mrgDet=!P.mrgDet;$('bMrg').className=P.mrgDet?'tb on':'tb';$('bMrg').textContent=(P.mrgDet?'◉':'○')+' MERGE'}
+function tRoi(){P.autoRoi=!P.autoRoi;roi=null;roiSmooth=null;$('bRoi').className=P.autoRoi?'tb on':'tb';$('bRoi').textContent=(P.autoRoi?'◉':'○')+' AUTO ROI'}
+
+// =============================================
+// ROI DETECTION: find the largest dark circle
+// =============================================
+function detectROI(gray,w,h){
+  // 1. Create dark mask
+  const dark=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++) dark[i]=gray[i]<P.darkThresh?1:0;
+
+  // 2. Erode heavily to remove noise
+  const ero=new Uint8Array(w*h);
+  const k=3; // kernel radius
+  for(let y=k;y<h-k;y++) for(let x=k;x<w-k;x++){
+    let allDark=true;
+    for(let dy=-k;dy<=k&&allDark;dy++) for(let dx=-k;dx<=k&&allDark;dx++){
+      if(!dark[(y+dy)*w+(x+dx)])allDark=false;
+    }
+    if(allDark)ero[y*w+x]=1;
+  }
+
+  // 3. Find largest connected dark region
+  const vis=new Uint8Array(w*h);
+  let bestBlob=null,bestSize=0;
+
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const idx=y*w+x;
+    if(vis[idx]||!ero[idx])continue;
+    const stk=[x,y];let cx=0,cy=0,cnt=0,x0=w,y0=h,x1=0,y1=0;
+    while(stk.length){
+      const py=stk.pop(),px=stk.pop();
+      if(px<0||px>=w||py<0||py>=h)continue;
+      const pi=py*w+px;
+      if(vis[pi]||!ero[pi])continue;
+      vis[pi]=1;cx+=px;cy+=py;cnt++;
+      if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;
+      stk.push(px+1,py,px-1,py,px,py+1,px,py-1);
+    }
+    if(cnt>bestSize){
+      bestSize=cnt;
+      bestBlob={cx:cx/cnt,cy:cy/cnt,x0,y0,x1,y1,area:cnt};
+    }
+  }
+
+  if(!bestBlob||bestBlob.area<(w*h*0.02))return null; // too small
+
+  // 4. Fit circle: use bounding box center and average radius
+  const bcx=bestBlob.cx;
+  const bcy=bestBlob.cy;
+  const bw2=bestBlob.x1-bestBlob.x0;
+  const bh2=bestBlob.y1-bestBlob.y0;
+  const r=Math.max(bw2,bh2)/2;
+
+  // Verify roughly circular
+  const asp=bw2/(bh2||1);
+  if(asp<0.5||asp>2.0)return null;
+
+  return{cx:bcx,cy:bcy,r:r};
+}
+
+function isInsideROI(x,y){
+  if(!roiSmooth)return true; // no ROI = accept all
+  const dx2=x-roiSmooth.cx,dy2=y-roiSmooth.cy;
+  return(dx2*dx2+dy2*dy2)<(roiSmooth.r*roiSmooth.r*1.05); // 5% margin
+}
+
+// =============================================
+// WHITE BLOB DETECTION (inside ROI only)
+// =============================================
+function detect(data,w,h){
+  const n=w*h,bin=new Uint8Array(n),gray=new Uint8Array(n);
+
+  for(let i=0;i<n;i++){
+    const r=data[i*4],g=data[i*4+1],b=data[i*4+2];
+    gray[i]=r*.299+g*.587+b*.114;
+    const mx2=Math.max(r,g,b),mn2=Math.min(r,g,b);
+    const sat=mx2===0?0:(mx2-mn2)/mx2;
+    let isW=gray[i]>P.thresh*.82&&sat<.30&&mn2>P.thresh*.5;
+    // ROI check at pixel level
+    if(isW&&P.autoRoi&&roiSmooth){
+      const px=i%w,py=Math.floor(i/w);
+      if(!isInsideROI(px,py))isW=false;
+    }
+    bin[i]=isW?1:0;
+  }
+
+  // ROI detection (every frame, on grayscale)
+  if(P.autoRoi){
+    const newRoi=detectROI(gray,w,h);
+    if(newRoi){
+      if(!roiSmooth){
+        roiSmooth={cx:newRoi.cx,cy:newRoi.cy,r:newRoi.r};
+      }else{
+        roiSmooth.cx+=(newRoi.cx-roiSmooth.cx)*ROI_ALPHA;
+        roiSmooth.cy+=(newRoi.cy-roiSmooth.cy)*ROI_ALPHA;
+        roiSmooth.r+=(newRoi.r-roiSmooth.r)*ROI_ALPHA;
+      }
+      roi=newRoi;
+    }
+  }
+
+  // Morphology
+  const ero=new Uint8Array(n);
+  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
+    const i=y*w+x;
+    if(bin[i]&&bin[i-1]&&bin[i+1]&&bin[i-w]&&bin[i+w])ero[i]=1;
+  }
+  const msk=new Uint8Array(n);
+  for(let y=1;y<h-1;y++) for(let x=1;x<w-1;x++){
+    const i=y*w+x;
+    if(ero[i]||ero[i-1]||ero[i+1]||ero[i-w]||ero[i+w])msk[i]=1;
+  }
+
+  // Connected components
+  const vis=new Uint8Array(n),blobs=[];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const idx=y*w+x;if(vis[idx]||!msk[idx])continue;
+    const stk=[x,y];let cx2=0,cy2=0,cnt=0,x0=w,y0=h,x1=0,y1=0,per=0;
+    while(stk.length){
+      const py=stk.pop(),px=stk.pop();
+      if(px<0||px>=w||py<0||py>=h)continue;
+      const pi=py*w+px;if(vis[pi]||!msk[pi])continue;
+      vis[pi]=1;cx2+=px;cy2+=py;cnt++;
+      if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;
+      let brd=px===0||px===w-1||py===0||py===h-1;
+      if(!brd&&(!msk[pi-1]||!msk[pi+1]||!msk[pi-w]||!msk[pi+w]))brd=true;
+      if(brd)per++;
+      stk.push(px+1,py,px-1,py,px,py+1,px,py-1);
+    }
+    if(cnt<P.minB)continue;
+    cx2/=cnt;cy2/=cnt;
+
+    // Skip if center outside ROI
+    if(P.autoRoi&&roiSmooth&&!isInsideROI(cx2,cy2))continue;
+
+    const bw2=x1-x0+1,bh2=y1-y0+1;
+    const circ=per>0?(4*Math.PI*cnt)/(per*per):0;
+
+    // For small blobs: strict circularity. For large (potential merge): relaxed
+    const isMergeCandidate=medArea>0&&cnt>(medArea*1.6);
+    const circThresh=isMergeCandidate?P.circ*0.6:P.circ;
+
+    if(circ<circThresh)continue;
+    if(cnt>P.maxB)continue;
+
+    const radius=Math.sqrt(cnt/Math.PI);
+    blobs.push({cx:cx2,cy:cy2,radius,area:cnt,circ});
+  }
+
+  return{blobs,gray,msk};
+}
+
+// =============================================
+// TRACKER WITH VELOCITY PREDICTION
+// =============================================
+function trackBlobs(newBlobs){
+  const alpha=0.55;
+
+  // Predict
+  for(const t of trk){t.px=t.cx+t.vx;t.py=t.cy+t.vy}
+
+  const usedN=new Set();
+  const sortedTrk=[...trk].sort((a,b)=>b.age-a.age);
+
+  for(const t of sortedTrk){
+    let bestD=Infinity,bestJ=-1;
+    const speed=Math.sqrt(t.vx*t.vx+t.vy*t.vy);
+    const maxD=P.baseDist+speed*2;
+
+    for(let j=0;j<newBlobs.length;j++){
+      if(usedN.has(j))continue;
+      const ddx=t.px-newBlobs[j].cx,ddy=t.py-newBlobs[j].cy;
+      const d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d<bestD&&d<maxD){bestD=d;bestJ=j}
+    }
+
+    if(bestJ>=0){
+      const nb=newBlobs[bestJ];
+      t.vx=t.vx*(1-alpha)+(nb.cx-t.cx)*alpha;
+      t.vy=t.vy*(1-alpha)+(nb.cy-t.cy)*alpha;
+      t.cx=nb.cx;t.cy=nb.cy;
+      t.radius=nb.radius;t.area=nb.area;t.circ=nb.circ;
+      t.lost=0;t.age++;
+      usedN.add(bestJ);
+    }else{
+      t.lost++;
+      t.cx=t.px;t.cy=t.py;
+      t.vx*=.75;t.vy*=.75;
+    }
+  }
+
+  // New tracks (only for blobs with good circularity)
+  for(let j=0;j<newBlobs.length;j++){
+    if(usedN.has(j))continue;
+    const b=newBlobs[j];
+    if(b.circ>=P.circ*.85){
+      trk.push({id:nId++,cx:b.cx,cy:b.cy,vx:0,vy:0,radius:b.radius,area:b.area,circ:b.circ,age:1,lost:0});
+    }
+  }
+
+  // Cleanup
+  trk=trk.filter(t=>t.lost<=10);
+
+  // Learn single-ball area from confirmed small blobs
+  const confirmed=trk.filter(t=>t.age>=P.confF&&t.lost===0);
+  if(confirmed.length>=2){
+    const areas=confirmed.map(t=>t.area).sort((a,b)=>a-b);
+    // Take the 25th percentile as single-ball reference
+    const q1=areas[Math.floor(areas.length*0.25)];
+    areaHist.push(q1);
+    if(areaHist.length>200)areaHist.shift();
+    const sorted=[...areaHist].sort((a,b)=>a-b);
+    medArea=sorted[Math.floor(sorted.length*0.5)];
+  }
+}
+
+function getConfirmed(){return trk.filter(t=>t.age>=P.confF&&t.lost===0)}
+
+// =============================================
+// ESTIMATION
+// =============================================
+function computeEstimate(){
+  const confirmed=getConfirmed();
+
+  // Count confirmed balls, adding merge estimation
+  let total=0;
+  for(const t of confirmed){
+    if(P.mrgDet&&medArea>10){
+      const n=t.area/medArea;
+      if(n>=1.7) total+=Math.round(n);
+      else total+=1;
+    }else{
+      total+=1;
+    }
+  }
+  return total;
+}
+
+function stats(){
+  const win=histEst.slice(-P.win);
+  if(!win.length)return{est:0,conf:0};
+  const sorted=[...win].sort((a,b)=>a-b);
+  const p85=sorted[Math.floor(sorted.length*.85)];
+  const mean=win.reduce((a,b)=>a+b,0)/win.length;
+  const vari=win.reduce((a,b)=>a+(b-mean)**2,0)/win.length;
+  const cv=mean>0?Math.sqrt(vari)/mean:0;
+  const conf=Math.max(0,Math.min(100,Math.round((1-Math.min(cv*.8,1))*100)));
+  return{est:p85,conf};
+}
+
+// Graph
+function drawGraph(){
+  const W=gC.clientWidth,H=55;gC.width=W;gC.height=H;
+  gx.fillStyle='#0a0a12';gx.fillRect(0,0,W,H);
+  const d=histEst.slice(-W);
+  if(d.length<2)return;
+  const mv=Math.max(...d,1);
+  const bw=Math.max(1,W/d.length);
+  for(let i=0;i<d.length;i++){
+    const v=d[i]/mv;
+    gx.fillStyle=`rgba(0,255,170,${.12+v*.4})`;
+    gx.fillRect(i*bw,H-v*(H-6)-2,Math.max(1,bw-.5),v*(H-6));
+  }
+  const s=stats();
+  if(s.est>0){
+    const ey=H-((s.est/mv)*(H-6))-2;
+    gx.strokeStyle='#00ffaa';gx.lineWidth=1;gx.setLineDash([3,3]);
+    gx.beginPath();gx.moveTo(0,ey);gx.lineTo(W,ey);gx.stroke();gx.setLineDash([]);
+    gx.fillStyle='#00ffaa';gx.font='bold 8px JetBrains Mono';
+    gx.fillText('P85: '+s.est,3,ey-2);
+  }
+}
+
+// =============================================
+// MAIN LOOP
+// =============================================
+function loop(){
+  if(!on)return;
+  if(vid.readyState<2){aId=requestAnimationFrame(loop);return}
+
+  fn++;const now=performance.now();
+  if(now-ft>=500){fv=Math.round(fn/((now-ft)/1000));fn=0;ft=now;$('hFps').textContent=fv;$('hFps').className='hv y'}
+
+  const sc=P.res/vid.videoWidth;
+  const w=Math.floor(vid.videoWidth*sc),h=Math.floor(vid.videoHeight*sc);
+  mC.width=w;mC.height=h;
+
+  mx.drawImage(vid,0,0,w,h);
+  const img=mx.getImageData(0,0,w,h);
+  const{blobs,gray,msk}=detect(img.data,w,h);
+  pGray=gray;
+
+  trackBlobs(blobs);
+  const confirmed=getConfirmed();
+  const est=computeEstimate();
+
+  histEst.push(est);
+  if(histEst.length>MH)histEst.shift();
+  const s=stats();
+
+  // --- DRAW ---
+  mx.drawImage(vid,0,0,w,h);
+
+  // Draw ROI circle
+  if(roiSmooth&&P.autoRoi){
+    mx.beginPath();
+    mx.arc(roiSmooth.cx,roiSmooth.cy,roiSmooth.r,0,Math.PI*2);
+    mx.strokeStyle='rgba(0,255,170,.25)';mx.lineWidth=1.5;
+    mx.setLineDash([4,4]);mx.stroke();mx.setLineDash([]);
+  }
+
+  // Draw balls
+  for(const t of trk){
+    if(t.lost>2)continue;
+    const opacity=t.lost>0?.2:(t.age<P.confF?.35:1);
+    mx.globalAlpha=opacity;
+
+    let estN=1;
+    if(P.mrgDet&&medArea>10){const n=t.area/medArea;if(n>=1.7)estN=Math.round(n)}
+
+    if(t.age<P.confF){
+      // Unconfirmed: small orange dot
+      mx.beginPath();mx.arc(t.cx,t.cy,t.radius*.8,0,Math.PI*2);
+      mx.strokeStyle='#ffaa00';mx.lineWidth=1;mx.setLineDash([2,2]);mx.stroke();mx.setLineDash([]);
+    }else if(estN>1){
+      // Merged: blue ring + count
+      mx.beginPath();mx.arc(t.cx,t.cy,t.radius*1.4,0,Math.PI*2);
+      mx.strokeStyle='#44aaff';mx.lineWidth=2.5;mx.stroke();
+      mx.font='bold 10px Space Grotesk';
+      const lbl='×'+estN;const tw=mx.measureText(lbl).width;
+      mx.fillStyle='rgba(0,0,0,.7)';mx.fillRect(t.cx-tw/2-2,t.cy-t.radius*1.6-11,tw+4,13);
+      mx.fillStyle='#44aaff';mx.fillText(lbl,t.cx-tw/2,t.cy-t.radius*1.6);
+    }else{
+      // Single confirmed: green ring + ID
+      mx.beginPath();mx.arc(t.cx,t.cy,t.radius*1.4,0,Math.PI*2);
+      mx.strokeStyle='#00ffaa';mx.lineWidth=2;mx.stroke();
+      const lbl='#'+t.id;mx.font='bold 8px JetBrains Mono';
+      const tw=mx.measureText(lbl).width;
+      mx.fillStyle='rgba(0,0,0,.6)';mx.fillRect(t.cx-tw/2-2,t.cy-t.radius*1.6-10,tw+4,11);
+      mx.fillStyle='#00ffaa';mx.fillText(lbl,t.cx-tw/2,t.cy-t.radius*1.6-1);
+    }
+
+    // Velocity vector
+    if(t.age>=P.confF&&Math.abs(t.vx)+Math.abs(t.vy)>1.5){
+      mx.beginPath();mx.moveTo(t.cx,t.cy);mx.lineTo(t.cx+t.vx*3,t.cy+t.vy*3);
+      mx.strokeStyle='rgba(0,255,170,.25)';mx.lineWidth=1;mx.stroke();
+    }
+    mx.globalAlpha=1;
+  }
+
+  // Debug
+  if(dbg){
+    dC.width=w;dC.height=h;
+    const di=dx.createImageData(w,h);
+    for(let i=0;i<w*h;i++){
+      const px=i%w,py=Math.floor(i/w);
+      const inR=isInsideROI(px,py);
+      if(msk[i]){di.data[i*4]=255;di.data[i*4+1]=255;di.data[i*4+2]=255}
+      else if(!inR){di.data[i*4]=20;di.data[i*4+1]=5;di.data[i*4+2]=5}
+      else{di.data[i*4]=0;di.data[i*4+1]=0;di.data[i*4+2]=0}
+      di.data[i*4+3]=255;
+    }
+    dx.putImageData(di,0,0);
+    // Draw ROI on debug
+    if(roiSmooth){
+      dx.beginPath();dx.arc(roiSmooth.cx,roiSmooth.cy,roiSmooth.r,0,Math.PI*2);
+      dx.strokeStyle='#ff4444';dx.lineWidth=1;dx.stroke();
+    }
+  }
+
+  // HUD
+  $('hRaw').textContent=blobs.length;$('hRaw').className=blobs.length>0?'hv y':'hv';
+  $('hEst').textContent=s.est;$('hEst').className=s.est>0?'hv g':'hv';
+  $('hMainC').className=s.est>0?'hc m a':'hc m';
+  $('hEstU').textContent='boule'+(s.est!==1?'s':'');
+  $('hConf').textContent=confirmed.length;$('hConf').className=confirmed.length>0?'hv g':'hv';
+
+  $('cPct').textContent=s.conf+'%';
+  const bar=$('cBar');bar.style.width=s.conf+'%';
+  bar.style.background=s.conf>70?'#00ffaa':s.conf>40?'#ffaa00':'#ff4444';
+
+  // ROI status
+  const rst=$('roiSt');
+  if(!P.autoRoi){rst.className='roi-status missing';rst.textContent='ROI : désactivé'}
+  else if(roiSmooth){rst.className='roi-status found';rst.textContent=`ROI : cercle détecté (r=${Math.round(roiSmooth.r)}px, centre=${Math.round(roiSmooth.cx)},${Math.round(roiSmooth.cy)})`}
+  else{rst.className='roi-status missing';rst.textContent='ROI : recherche du cercle noir...'}
+
+  drawGraph();
+
+  // Blob detail
+  if(confirmed.length>0){
+    $('bP').className='bp s';
+    $('bL').innerHTML=confirmed.map(t=>{
+      let extra='';
+      if(P.mrgDet&&medArea>10){const n=t.area/medArea;if(n>=1.7)extra=`<span class="sp">·</span><span class="v" style="color:#44aaff">×${Math.round(n)}</span>`}
+      const spd=Math.sqrt(t.vx*t.vx+t.vy*t.vy).toFixed(1);
+      return`<div class="bi"><span class="id">#${t.id}</span><span class="sp">·</span><span class="v">v=${spd}</span>${extra}</div>`;
+    }).join('');
+  }else{$('bP').className='bp'}
+
+  aId=requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

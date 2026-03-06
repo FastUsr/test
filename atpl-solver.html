@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ATPL Solver</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #1a2235;
+    --bg-card-hover: #1f2a40;
+    --accent: #00e5a0;
+    --accent-dim: #00e5a020;
+    --accent-glow: #00e5a040;
+    --text-primary: #e8edf5;
+    --text-secondary: #8892a4;
+    --text-dim: #4a5568;
+    --border: #2a3548;
+    --danger: #ff4d6a;
+    --warning: #ffb020;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    background: linear-gradient(180deg, var(--bg-primary) 60%, transparent);
+    backdrop-filter: blur(12px);
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; }
+  .topbar-icon {
+    width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: var(--bg-primary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .topbar-title { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 15px; color: var(--text-primary); }
+  .topbar-subtitle { font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; text-transform: uppercase; }
+  .topbar-btn {
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text-secondary); padding: 6px 10px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    display: flex; align-items: center; gap: 5px; transition: all 0.2s;
+  }
+  .topbar-btn:active { background: var(--bg-card); }
+  .topbar-btn svg { width: 14px; height: 14px; }
+
+  .container {
+    padding: 68px 16px 32px; max-width: 480px; margin: 0 auto;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* Setup */
+  .setup-screen {
+    display: flex; flex-direction: column; gap: 20px;
+    padding: 24px; margin-top: 20px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+  }
+  .setup-screen h2 { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; }
+  .setup-screen p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+  .setup-screen a { color: var(--accent); text-decoration: underline; }
+  .setup-input {
+    width: 100%; padding: 14px 16px;
+    background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-input::placeholder { color: var(--text-dim); }
+  .setup-steps { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--bg-primary); border-radius: 10px; }
+  .setup-step { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  .setup-step-num {
+    flex-shrink: 0; width: 22px; height: 22px;
+    background: var(--accent-dim); color: var(--accent); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  }
+
+  /* Camera */
+  .camera-section {
+    position: relative; border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--bg-card); aspect-ratio: 4/3;
+  }
+  .camera-section video, .camera-section canvas, .camera-section img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .camera-section canvas { display: none; }
+  .camera-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: var(--bg-card); gap: 12px; transition: opacity 0.3s;
+  }
+  .camera-overlay.hidden { opacity: 0; pointer-events: none; }
+  .camera-overlay svg { width: 48px; height: 48px; color: var(--text-dim); }
+  .camera-overlay span { font-size: 13px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+  .preview-img { display: none; width: 100%; height: 100%; object-fit: cover; }
+  .preview-img.visible { display: block; }
+  .scan-line {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    top: 0; display: none; animation: scan 2s ease-in-out infinite;
+  }
+  .scan-line.active { display: block; }
+  @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+  .corner { position: absolute; width: 20px; height: 20px; border-color: var(--accent); border-style: solid; }
+  .corner-tl { top: 12px; left: 12px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+  .corner-tr { top: 12px; right: 12px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
+  .corner-bl { bottom: 12px; left: 12px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
+  .corner-br { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+
+  /* Buttons */
+  .controls { display: flex; gap: 10px; }
+  .btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 20px; border-radius: 12px; border: none;
+    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 14px;
+    cursor: pointer; transition: all 0.2s; -webkit-user-select: none;
+  }
+  .btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .btn-primary { background: var(--accent); color: var(--bg-primary); }
+  .btn-primary:active { transform: scale(0.97); filter: brightness(0.9); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); }
+  .btn-secondary:active { background: var(--bg-card-hover); }
+
+  /* Answer */
+  .answer-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .answer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+  }
+  .answer-header-left { display: flex; align-items: center; gap: 8px; }
+  .answer-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: 6px;
+    background: var(--accent-dim); color: var(--accent);
+  }
+  .answer-tag.processing { background: var(--warning); color: var(--bg-primary); animation: blink 1s ease infinite; }
+  @keyframes blink { 50% { opacity: 0.5; } }
+  .answer-body { padding: 18px; }
+  .answer-body p { font-size: 14px; line-height: 1.7; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+  .loading-dots { display: flex; gap: 6px; padding: 20px 18px; }
+  .loading-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); animation: bounce 1.4s ease infinite; }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); background: var(--accent); } }
+  .error-msg {
+    padding: 14px 18px; background: #ff4d6a15; border: 1px solid #ff4d6a40;
+    border-radius: 12px; color: var(--danger); font-size: 13px; line-height: 1.5;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .upload-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;
+  }
+  .upload-row label { text-decoration: underline; cursor: pointer; color: var(--accent); }
+  #fileInput { display: none; }
+
+  /* Subject chips */
+  .subject-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
+  .subject-bar::-webkit-scrollbar { display: none; }
+  .subject-chip {
+    flex-shrink: 0; padding: 8px 14px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--bg-card);
+    color: var(--text-secondary); font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .subject-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .subject-chip:active { transform: scale(0.96); }
+
+  /* History */
+  .history-toggle {
+    display: flex; align-items: center; gap: 8px; padding: 10px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary);
+    cursor: pointer; border: none; background: none; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .history-toggle svg { width: 14px; height: 14px; transition: transform 0.2s; }
+  .history-toggle.open svg { transform: rotate(180deg); }
+  .history-list { display: none; flex-direction: column; gap: 10px; }
+  .history-list.visible { display: flex; }
+  .history-item {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; cursor: pointer; transition: background 0.2s;
+  }
+  .history-item:active { background: var(--bg-card-hover); }
+  .history-item-q { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item-a { font-size: 14px; font-weight: 600; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-icon">A</div>
+    <div>
+      <div class="topbar-title">ATPL Solver</div>
+      <div class="topbar-subtitle">OpenRouter · Free</div>
+    </div>
+  </div>
+  <button class="topbar-btn" id="settingsBtn" onclick="showSetup()" style="display:none;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    API
+  </button>
+</div>
+
+<div class="container">
+
+  <!-- SETUP -->
+  <div id="setupScreen" class="setup-screen">
+    <h2>Configuration</h2>
+    <p>Clé API OpenRouter — gratuit, modèles vision inclus, fonctionne en EU.</p>
+    <div class="setup-steps">
+      <div class="setup-step"><div class="setup-step-num">1</div><span>Va sur <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></span></div>
+      <div class="setup-step"><div class="setup-step-num">2</div><span>Crée un compte (Google login OK)</span></div>
+      <div class="setup-step"><div class="setup-step-num">3</div><span>Crée une clé API et copie-la ici</span></div>
+    </div>
+    <input type="text" id="apiKeyInput" class="setup-input" placeholder="Colle ta clé ici (sk-or-...)" autocomplete="off" spellcheck="false">
+    <button class="btn btn-primary" onclick="saveKey()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+      Activer
+    </button>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="mainApp" style="display:none;">
+    <div class="subject-bar">
+      <div class="subject-chip active" data-subject="english" onclick="selectSubject(this)">English</div>
+      <div class="subject-chip" data-subject="general" onclick="selectSubject(this)">Air Law</div>
+      <div class="subject-chip" data-subject="meteo" onclick="selectSubject(this)">Météo</div>
+      <div class="subject-chip" data-subject="nav" onclick="selectSubject(this)">Nav</div>
+      <div class="subject-chip" data-subject="ops" onclick="selectSubject(this)">OPS/FPL</div>
+      <div class="subject-chip" data-subject="pof" onclick="selectSubject(this)">POF</div>
+      <div class="subject-chip" data-subject="agk" onclick="selectSubject(this)">AGK</div>
+      <div class="subject-chip" data-subject="hpf" onclick="selectSubject(this)">HPF</div>
+    </div>
+
+    <div class="camera-section" id="cameraSection">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <img id="preview" class="preview-img" alt="">
+      <div class="scan-line" id="scanLine"></div>
+      <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+      <div class="camera-overlay" id="cameraOverlay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Tap pour activer la caméra</span>
+      </div>
+    </div>
+
+    <div class="controls" id="controlsInit">
+      <button class="btn btn-primary" onclick="startCamera()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Activer caméra
+      </button>
+    </div>
+    <div class="controls" id="controlsCapture" style="display:none;">
+      <button class="btn btn-primary" onclick="capture()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+        Capturer
+      </button>
+      <button class="btn btn-secondary" onclick="switchCam()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      </button>
+    </div>
+    <div class="controls" id="controlsAnalyze" style="display:none;">
+      <button class="btn btn-primary" id="btnAnalyze" onclick="analyze()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        Analyser
+      </button>
+      <button class="btn btn-secondary" onclick="retake()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1014.85-3.36L23 10"/></svg>
+        Reprendre
+      </button>
+    </div>
+
+    <div class="upload-row">
+      <span>ou</span>
+      <label for="fileInput">importer une photo</label>
+      <input type="file" id="fileInput" accept="image/*" onchange="handleFile(event)">
+    </div>
+
+    <div id="answerArea"></div>
+
+    <button class="history-toggle" id="historyToggle" onclick="toggleHistory()" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      Historique
+    </button>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let apiKey = localStorage.getItem('openrouter_key') || '';
+let stream = null;
+let facing = 'environment';
+let b64 = null;
+let hist = JSON.parse(localStorage.getItem('atpl_hist') || '[]');
+let subject = 'english';
+
+const SUBJ = {
+  english: 'Aviation English',
+  general: 'Air Law / ATPL General',
+  meteo: 'Meteorology',
+  nav: 'General Navigation / Radio Navigation',
+  ops: 'Operational Procedures / Flight Planning',
+  pof: 'Principles of Flight',
+  agk: 'Aircraft General Knowledge (Systems & Instruments)',
+  hpf: 'Human Performance & Limitations'
+};
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const preview = document.getElementById('preview');
+const overlay = document.getElementById('cameraOverlay');
+const scanLine = document.getElementById('scanLine');
+
+// Init
+if (apiKey) initApp();
+
+function initApp() {
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('settingsBtn').style.display = 'flex';
+  renderHist();
+}
+
+// ── Setup ──
+function saveKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k) { alert("Colle ta clé API OpenRouter"); return; }
+  apiKey = k;
+  localStorage.setItem('openrouter_key', k);
+  initApp();
+}
+
+function showSetup() {
+  document.getElementById('setupScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('apiKeyInput').value = apiKey;
+}
+
+function selectSubject(el) {
+  document.querySelectorAll('.subject-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  subject = el.dataset.subject;
+}
+
+// ── Camera ──
+async function startCamera() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1440 } } });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    preview.classList.remove('visible');
+    overlay.classList.add('hidden');
+    show('controlsCapture');
+  } catch(e) { alert("Caméra inaccessible. Utilise l'import photo."); }
+}
+
+function switchCam() { facing = facing === 'environment' ? 'user' : 'environment'; startCamera(); }
+
+function capture() {
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  preview.src = 'data:image/jpeg;base64,' + b64;
+  preview.classList.add('visible');
+  video.style.display = 'none';
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  show('controlsAnalyze');
+}
+
+function handleFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    b64 = ev.target.result.split(',')[1];
+    preview.src = ev.target.result;
+    preview.classList.add('visible');
+    video.style.display = 'none';
+    overlay.classList.add('hidden');
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    show('controlsAnalyze');
+  };
+  r.readAsDataURL(f);
+}
+
+function retake() {
+  b64 = null; preview.classList.remove('visible');
+  document.getElementById('answerArea').innerHTML = '';
+  startCamera();
+}
+
+function show(id) {
+  ['controlsInit','controlsCapture','controlsAnalyze'].forEach(c => document.getElementById(c).style.display = 'none');
+  document.getElementById(id).style.display = 'flex';
+}
+
+overlay.addEventListener('click', startCamera);
+
+// ── Analyze ──
+async function analyze() {
+  if (!b64 || !apiKey) return;
+  const area = document.getElementById('answerArea');
+  const btn = document.getElementById('btnAnalyze');
+  scanLine.classList.add('active'); btn.disabled = true;
+
+  area.innerHTML = `<div class="answer-card"><div class="answer-header"><div class="answer-header-left"><span class="answer-tag processing">Analyse en cours</span></div></div><div class="loading-dots"><span></span><span></span><span></span></div></div>`;
+
+  const prompt = `Tu es un expert ATPL (Airline Transport Pilot License), spécialité : ${SUBJ[subject] || 'ATPL'}.
+
+Analyse cette photo d'une question d'examen ATPL.
+
+INSTRUCTIONS :
+1. Lis et retranscris la question et toutes les options (A, B, C, D)
+2. Identifie la BONNE RÉPONSE
+3. Explique BRIÈVEMENT pourquoi c'est la bonne réponse (2-3 phrases max)
+4. Si c'est du vocabulaire aviation, donne la définition du terme clé
+
+FORMAT :
+📋 QUESTION : [retranscription]
+
+✅ RÉPONSE : [Lettre] — [texte de la réponse]
+
+💡 EXPLICATION : [explication courte]
+
+Si l'image n'est pas une question ATPL, dis-le simplement.`;
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }
+          ]
+        }],
+        max_tokens: 1024
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(`HTTP ${res.status} — ${data.error?.message || JSON.stringify(data).substring(0, 300)}`);
+
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) throw new Error('Réponse vide: ' + JSON.stringify(data).substring(0, 200));
+    const letter = (text.match(/RÉPONSE\s*:\s*([A-D])/i) || [])[1] || null;
+    const qMatch = text.match(/QUESTION\s*:\s*(.+?)(?=\n|✅)/s);
+
+    hist.unshift({
+      q: qMatch ? qMatch[1].trim().substring(0, 80) : 'Question ATPL',
+      a: letter || '?', text, subject,
+      t: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    });
+    if (hist.length > 50) hist = hist.slice(0, 50);
+    localStorage.setItem('atpl_hist', JSON.stringify(hist));
+    renderHist();
+
+    scanLine.classList.remove('active');
+    area.innerHTML = `<div class="answer-card"><div class="answer-header"><div class="answer-header-left"><span class="answer-tag">Résolu</span></div>${letter ? `<span style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--accent);">${letter}</span>` : ''}</div><div class="answer-body"><p>${esc(text)}</p></div></div>`;
+
+  } catch(err) {
+    scanLine.classList.remove('active');
+    area.innerHTML = `<div class="error-msg">Erreur : ${esc(err.message)}</div>`;
+  }
+  btn.disabled = false;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── History ──
+function toggleHistory() {
+  document.getElementById('historyToggle').classList.toggle('open');
+  document.getElementById('historyList').classList.toggle('visible');
+}
+
+function renderHist() {
+  const t = document.getElementById('historyToggle');
+  const l = document.getElementById('historyList');
+  if (hist.length > 0 && t) t.style.display = 'flex';
+  if (l) l.innerHTML = hist.map((h, i) => `<div class="history-item" onclick="showHist(${i})"><div class="history-item-q">${esc(h.q)}</div><div class="history-item-a">${h.t} · ${h.subject} · Rép: ${h.a}</div></div>`).join('');
+}
+
+function showHist(i) {
+  const h = hist[i];
+  document.getElementById('answerArea').innerHTML = `<div class="answer-card"><div class="answer-header"><div class="answer-header-left"><span class="answer-tag">Historique</span></div><span style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--accent);">${h.a}</span></div><div class="answer-body"><p>${esc(h.text)}</p></div></div>`;
+}
+</script>
+</body>
+</html>

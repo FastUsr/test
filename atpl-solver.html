@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ATPL Solver</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0e17; --card: #1a2235; --card2: #1f2a40;
+    --accent: #00e5a0; --accent-dim: #00e5a020; --accent-glow: #00e5a040;
+    --text: #e8edf5; --text2: #8892a4; --text3: #4a5568;
+    --border: #2a3548; --danger: #ff4d6a; --warn: #ffb020;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100dvh; overflow-x: hidden; }
+
+  /* ── Topbar ── */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; background: linear-gradient(180deg, var(--bg) 60%, transparent);
+    backdrop-filter: blur(12px);
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 8px; }
+  .topbar-icon {
+    width: 30px; height: 30px; background: var(--accent); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: var(--bg);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .topbar-title { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; }
+  .topbar-sub { font-size: 10px; color: var(--text2); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; text-transform: uppercase; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .topbar-btn {
+    background: none; border: 1px solid var(--border); border-radius: 7px;
+    color: var(--text2); padding: 5px 8px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .container { padding: 60px 14px 32px; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ── Setup ── */
+  .setup {
+    display: flex; flex-direction: column; gap: 16px; padding: 20px; margin-top: 16px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  }
+  .setup h2 { font-family: 'JetBrains Mono', monospace; font-size: 16px; }
+  .setup p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+  .setup a { color: var(--accent); }
+  .setup-input {
+    width: 100%; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; outline: none;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-steps { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg); border-radius: 8px; }
+  .setup-step { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .step-n {
+    flex-shrink: 0; width: 20px; height: 20px; background: var(--accent-dim); color: var(--accent);
+    border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  }
+
+  /* ── Mode toggle ── */
+  .mode-bar {
+    display: flex; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .mode-btn {
+    flex: 1; padding: 10px; border: none; background: none; color: var(--text2);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .mode-btn.active { background: var(--accent-dim); color: var(--accent); }
+  .mode-btn svg { width: 14px; height: 14px; }
+
+  /* ── Auto status ── */
+  .auto-status {
+    display: none; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text2); align-items: center; gap: 8px;
+  }
+  .auto-status.visible { display: flex; }
+  .auto-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .auto-dot.watching { background: var(--text3); }
+  .auto-dot.changing { background: var(--warn); animation: pulse 0.6s ease infinite; }
+  .auto-dot.stable { background: var(--accent); animation: pulse 0.4s ease infinite; }
+  .auto-dot.analyzing { background: var(--warn); animation: spin-dot 1s linear infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  @keyframes spin-dot { 50% { transform: scale(1.4); opacity: 0.5; } }
+
+  .auto-bar-wrap { flex: 1; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+  .auto-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+
+  /* ── Subjects ── */
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0; padding: 7px 12px; border-radius: 18px;
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--text2); font-size: 11px; font-family: 'JetBrains Mono', monospace;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── Camera ── */
+  .cam-wrap {
+    position: relative; border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--card); aspect-ratio: 4/3;
+  }
+  .cam-wrap video, .cam-wrap canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam-wrap canvas { display: none; }
+  .cam-wrap .preview { display: none; width: 100%; height: 100%; object-fit: cover; }
+  .cam-wrap .preview.vis { display: block; }
+  .cam-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: var(--card); gap: 10px;
+    transition: opacity 0.3s;
+  }
+  .cam-overlay.hid { opacity: 0; pointer-events: none; }
+  .cam-overlay svg { width: 40px; height: 40px; color: var(--text3); }
+  .cam-overlay span { font-size: 12px; color: var(--text2); font-family: 'JetBrains Mono', monospace; }
+
+  .scan-line {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    top: 0; display: none; animation: scan 2s ease-in-out infinite;
+  }
+  .scan-line.on { display: block; }
+  @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+
+  .corner { position: absolute; width: 16px; height: 16px; border-color: var(--accent); border-style: solid; }
+  .c-tl { top: 10px; left: 10px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
+  .c-tr { top: 10px; right: 10px; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
+  .c-bl { bottom: 10px; left: 10px; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
+  .c-br { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
+
+  /* Auto-mode border glow */
+  .cam-wrap.auto-active { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); transition: all 0.3s; }
+
+  /* ── Buttons ── */
+  .ctrls { display: flex; gap: 8px; }
+  .btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 12px 16px; border-radius: 10px; border: none;
+    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .btn-p { background: var(--accent); color: var(--bg); }
+  .btn-p:active { transform: scale(0.97); }
+  .btn-p:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-s { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+
+  .upload-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text2); font-family: 'JetBrains Mono', monospace;
+  }
+  .upload-row label { text-decoration: underline; cursor: pointer; color: var(--accent); }
+  #fileInput { display: none; }
+
+  /* ── Answer ── */
+  .answer-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; animation: up 0.4s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes up { from { opacity: 0; transform: translateY(12px); } }
+  .ans-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+  }
+  .ans-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px;
+    background: var(--accent-dim); color: var(--accent);
+  }
+  .ans-tag.proc { background: var(--warn); color: var(--bg); animation: blink 1s ease infinite; }
+  @keyframes blink { 50% { opacity: 0.5; } }
+  .ans-letter {
+    font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent);
+  }
+  .ans-body { padding: 16px; }
+  .ans-body p { font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .dots { display: flex; gap: 5px; padding: 16px; }
+  .dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); animation: bounce 1.4s ease infinite; }
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); background: var(--accent); } }
+  .err {
+    padding: 12px 16px; background: #ff4d6a15; border: 1px solid #ff4d6a40;
+    border-radius: 10px; color: var(--danger); font-size: 12px; line-height: 1.5;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── History ── */
+  .hist-btn {
+    display: flex; align-items: center; gap: 6px; padding: 8px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text2);
+    cursor: pointer; border: none; background: none; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .hist-btn svg { width: 12px; height: 12px; transition: transform 0.2s; }
+  .hist-btn.open svg { transform: rotate(180deg); }
+  .hist-list { display: none; flex-direction: column; gap: 8px; }
+  .hist-list.vis { display: flex; }
+  .hist-item {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; cursor: pointer;
+  }
+  .hist-item-q { font-size: 12px; color: var(--text2); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-item-a { font-size: 13px; font-weight: 600; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Question counter ── */
+  .counter {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text3);
+    text-align: center; padding: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-icon">A</div>
+    <div>
+      <div class="topbar-title">ATPL Solver</div>
+      <div class="topbar-sub">OpenRouter · Free</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="topbar-btn" id="settingsBtn" onclick="showSetup()" style="display:none;">API</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- SETUP -->
+  <div id="setupScreen" class="setup">
+    <h2>Configuration</h2>
+    <p>Clé API OpenRouter — gratuit, fonctionne en EU.</p>
+    <div class="setup-steps">
+      <div class="setup-step"><div class="step-n">1</div><span>Va sur <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></span></div>
+      <div class="setup-step"><div class="step-n">2</div><span>Crée un compte (Google login)</span></div>
+      <div class="setup-step"><div class="step-n">3</div><span>Crée une API key → copie ici</span></div>
+    </div>
+    <input type="text" id="apiKeyInput" class="setup-input" placeholder="sk-or-..." autocomplete="off" spellcheck="false">
+    <button class="btn btn-p" onclick="saveKey()">Activer</button>
+  </div>
+
+  <!-- MAIN -->
+  <div id="mainApp" style="display:none;">
+
+    <!-- Mode switch -->
+    <div class="mode-bar">
+      <button class="mode-btn active" id="modeManual" onclick="setMode('manual')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+        Manuel
+      </button>
+      <button class="mode-btn" id="modeAuto" onclick="setMode('auto')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-7.07l-2.83 2.83M9.76 14.24l-2.83 2.83m12.14 0l-2.83-2.83M9.76 9.76L6.93 6.93"/></svg>
+        Auto
+      </button>
+    </div>
+
+    <!-- Auto status -->
+    <div class="auto-status" id="autoStatus">
+      <div class="auto-dot watching" id="autoDot"></div>
+      <span id="autoLabel">En attente de changement...</span>
+      <div class="auto-bar-wrap"><div class="auto-bar" id="autoBar"></div></div>
+    </div>
+
+    <!-- Subjects -->
+    <div class="chips">
+      <div class="chip active" data-s="english" onclick="selSubj(this)">English</div>
+      <div class="chip" data-s="general" onclick="selSubj(this)">Air Law</div>
+      <div class="chip" data-s="meteo" onclick="selSubj(this)">Météo</div>
+      <div class="chip" data-s="nav" onclick="selSubj(this)">Nav</div>
+      <div class="chip" data-s="ops" onclick="selSubj(this)">OPS/FPL</div>
+      <div class="chip" data-s="pof" onclick="selSubj(this)">POF</div>
+      <div class="chip" data-s="agk" onclick="selSubj(this)">AGK</div>
+      <div class="chip" data-s="hpf" onclick="selSubj(this)">HPF</div>
+    </div>
+
+    <!-- Camera -->
+    <div class="cam-wrap" id="camWrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <img id="preview" class="preview" alt="">
+      <div class="scan-line" id="scanLine"></div>
+      <div class="corner c-tl"></div><div class="corner c-tr"></div>
+      <div class="corner c-bl"></div><div class="corner c-br"></div>
+      <div class="cam-overlay" id="overlay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Tap pour démarrer</span>
+      </div>
+    </div>
+
+    <!-- Manual controls -->
+    <div id="ctrlsInit" class="ctrls">
+      <button class="btn btn-p" onclick="startCam()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Activer caméra
+      </button>
+    </div>
+    <div id="ctrlsCap" class="ctrls" style="display:none;">
+      <button class="btn btn-p" onclick="capture()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+        Capturer
+      </button>
+      <button class="btn btn-s" onclick="flipCam()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      </button>
+    </div>
+    <div id="ctrlsAna" class="ctrls" style="display:none;">
+      <button class="btn btn-p" id="btnAna" onclick="analyze()">Analyser</button>
+      <button class="btn btn-s" onclick="retake()">Reprendre</button>
+    </div>
+
+    <div class="upload-row">
+      <span>ou</span>
+      <label for="fileInput">importer photo</label>
+      <input type="file" id="fileInput" accept="image/*" onchange="handleFile(event)">
+    </div>
+
+    <div id="answerArea"></div>
+
+    <div class="counter" id="counter"></div>
+
+    <button class="hist-btn" id="histBtn" onclick="toggleHist()" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      Historique
+    </button>
+    <div class="hist-list" id="histList"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+let apiKey = localStorage.getItem('or_key') || '';
+let stream = null, facing = 'environment', b64 = null;
+let hist = JSON.parse(localStorage.getItem('atpl_h') || '[]');
+let subject = 'english', mode = 'manual';
+let autoInterval = null, analyzing = false;
+let prevFrameData = null, stableCount = 0, changeDetected = false;
+let lastAnalyzeTime = 0;
+const COOLDOWN = 30000; // 30s minimum between API calls
+
+const SUBJ = {
+  english:'Aviation English', general:'Air Law / ATPL General',
+  meteo:'Meteorology', nav:'General Navigation / Radio Nav',
+  ops:'Operational Procedures / Flight Planning', pof:'Principles of Flight',
+  agk:'Aircraft General Knowledge', hpf:'Human Performance & Limitations'
+};
+
+const $ = id => document.getElementById(id);
+const video = $('video'), canvas = $('canvas'), preview = $('preview');
+const overlay = $('overlay'), scanLine = $('scanLine'), camWrap = $('camWrap');
+
+if (apiKey) initApp();
+
+function initApp() {
+  $('setupScreen').style.display = 'none';
+  $('mainApp').style.display = 'block';
+  $('settingsBtn').style.display = 'flex';
+  renderHist();
+}
+
+// ════════════════════════════════════════
+// SETUP
+// ════════════════════════════════════════
+function saveKey() {
+  const k = $('apiKeyInput').value.trim();
+  if (!k) return alert("Colle ta clé API OpenRouter");
+  apiKey = k; localStorage.setItem('or_key', k); initApp();
+}
+function showSetup() {
+  $('setupScreen').style.display = 'flex';
+  $('mainApp').style.display = 'none';
+  $('apiKeyInput').value = apiKey;
+}
+
+function selSubj(el) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active'); subject = el.dataset.s;
+}
+
+// ════════════════════════════════════════
+// MODE TOGGLE
+// ════════════════════════════════════════
+function setMode(m) {
+  mode = m;
+  $('modeManual').classList.toggle('active', m === 'manual');
+  $('modeAuto').classList.toggle('active', m === 'auto');
+  $('autoStatus').classList.toggle('visible', m === 'auto');
+  camWrap.classList.toggle('auto-active', m === 'auto');
+
+  if (m === 'auto') {
+    // Show only flip button in auto, hide other controls
+    showCtrl(null);
+    // Auto-start camera if not already running
+    if (!stream) startCam();
+    startAutoDetect();
+  } else {
+    stopAutoDetect();
+    if (stream) showCtrl('ctrlsCap');
+    else showCtrl('ctrlsInit');
+  }
+}
+
+// ════════════════════════════════════════
+// CAMERA
+// ════════════════════════════════════════
+async function startCam() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1440 } }
+    });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    preview.classList.remove('vis');
+    overlay.classList.add('hid');
+    if (mode === 'manual') showCtrl('ctrlsCap');
+  } catch(e) { alert("Caméra inaccessible."); }
+}
+
+function flipCam() { facing = facing === 'environment' ? 'user' : 'environment'; startCam(); }
+
+// Compress image to max 800px, quality 0.5 to reduce payload
+function compressCapture() {
+  const MAX = 800;
+  let w = video.videoWidth, h = video.videoHeight;
+  if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+  else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+}
+
+function capture() {
+  b64 = compressCapture();
+  preview.src = 'data:image/jpeg;base64,' + b64;
+  preview.classList.add('vis'); video.style.display = 'none';
+  if (mode === 'manual') {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    showCtrl('ctrlsAna');
+  }
+}
+
+function handleFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    // Compress uploaded image too
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+      else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      b64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+      preview.src = 'data:image/jpeg;base64,' + b64;
+      preview.classList.add('vis');
+      video.style.display = 'none'; overlay.classList.add('hid');
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      showCtrl('ctrlsAna');
+    };
+    img.src = ev.target.result;
+  };
+  r.readAsDataURL(f);
+}
+
+function retake() {
+  b64 = null; preview.classList.remove('vis');
+  $('answerArea').innerHTML = ''; startCam();
+}
+
+function showCtrl(id) {
+  ['ctrlsInit','ctrlsCap','ctrlsAna'].forEach(c => $(c).style.display = 'none');
+  if (id) $(id).style.display = 'flex';
+}
+
+overlay.addEventListener('click', startCam);
+
+// ════════════════════════════════════════
+// AUTO-DETECTION (100% local, zero API)
+// ════════════════════════════════════════
+const DETECT_INTERVAL = 2000;     // Check every 2s
+const CHANGE_THRESHOLD = 12;      // % of pixels that must differ = "new question"
+const STABLE_NEEDED = 2;          // Consecutive stable frames before triggering
+const THUMB_SIZE = 64;            // Tiny thumbnail for fast comparison
+
+function startAutoDetect() {
+  stopAutoDetect();
+  prevFrameData = null; stableCount = 0; changeDetected = false;
+  setAutoUI('watching', 'En attente...', 0);
+  autoInterval = setInterval(autoTick, DETECT_INTERVAL);
+}
+
+function stopAutoDetect() {
+  if (autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+  setAutoUI('watching', 'Arrêté', 0);
+}
+
+function autoTick() {
+  if (analyzing || !stream || !video.videoWidth) return;
+
+  // Show cooldown if active
+  const elapsed = Date.now() - lastAnalyzeTime;
+  if (elapsed < COOLDOWN && lastAnalyzeTime > 0) {
+    const wait = Math.ceil((COOLDOWN - elapsed) / 1000);
+    setAutoUI('watching', `Cooldown ${wait}s...`, ((elapsed / COOLDOWN) * 100));
+    // Still track frames but don't trigger
+  }
+
+  // Capture tiny thumbnail
+  const thumb = document.createElement('canvas');
+  thumb.width = THUMB_SIZE; thumb.height = THUMB_SIZE;
+  const ctx = thumb.getContext('2d');
+  ctx.drawImage(video, 0, 0, THUMB_SIZE, THUMB_SIZE);
+  const currentData = ctx.getImageData(0, 0, THUMB_SIZE, THUMB_SIZE).data;
+
+  if (!prevFrameData) {
+    prevFrameData = currentData;
+    setAutoUI('watching', 'Première capture...', 0);
+    return;
+  }
+
+  // Compare pixels
+  const diff = pixelDiff(prevFrameData, currentData);
+  prevFrameData = currentData;
+
+  if (diff > CHANGE_THRESHOLD) {
+    // Significant change — new question appearing
+    changeDetected = true;
+    stableCount = 0;
+    setAutoUI('changing', `Changement détecté (${diff.toFixed(0)}%)`, 0);
+  } else if (changeDetected) {
+    // Image stable after a change
+    stableCount++;
+    const pct = Math.min(100, (stableCount / STABLE_NEEDED) * 100);
+    setAutoUI('stable', `Stabilisation... ${stableCount}/${STABLE_NEEDED}`, pct);
+
+    if (stableCount >= STABLE_NEEDED) {
+      // Check cooldown before triggering
+      const sinceLastAnalyze = Date.now() - lastAnalyzeTime;
+      if (sinceLastAnalyze < COOLDOWN && lastAnalyzeTime > 0) {
+        const w = Math.ceil((COOLDOWN - sinceLastAnalyze) / 1000);
+        setAutoUI('watching', `Prêt — cooldown ${w}s...`, (sinceLastAnalyze / COOLDOWN) * 100);
+        return; // Keep changeDetected & stableCount, will trigger on next tick after cooldown
+      }
+      changeDetected = false;
+      stableCount = 0;
+      setAutoUI('analyzing', 'Analyse auto...', 100);
+      autoCapAndAnalyze();
+    }
+  } else {
+    setAutoUI('watching', 'En attente de changement...', 0);
+  }
+}
+
+function pixelDiff(a, b) {
+  let diffPixels = 0;
+  const total = a.length / 4;
+  for (let i = 0; i < a.length; i += 4) {
+    const dr = Math.abs(a[i] - b[i]);
+    const dg = Math.abs(a[i+1] - b[i+1]);
+    const db = Math.abs(a[i+2] - b[i+2]);
+    if ((dr + dg + db) / 3 > 30) diffPixels++;
+  }
+  return (diffPixels / total) * 100;
+}
+
+async function autoCapAndAnalyze() {
+  // Check cooldown
+  const elapsed = Date.now() - lastAnalyzeTime;
+  if (elapsed < COOLDOWN) {
+    const wait = Math.ceil((COOLDOWN - elapsed) / 1000);
+    setAutoUI('watching', `Cooldown ${wait}s...`, 0);
+    // Retry after remaining cooldown
+    setTimeout(() => {
+      changeDetected = true; stableCount = STABLE_NEEDED;
+      // Re-trigger on next tick
+    }, COOLDOWN - elapsed);
+    return;
+  }
+
+  // Capture current frame (compressed)
+  b64 = compressCapture();
+
+  await analyze();
+
+  // Reset for next question
+  prevFrameData = null; stableCount = 0; changeDetected = false;
+  setAutoUI('watching', 'En attente...', 0);
+}
+
+function setAutoUI(state, label, barPct) {
+  const dot = $('autoDot'), lbl = $('autoLabel'), bar = $('autoBar');
+  dot.className = 'auto-dot ' + state;
+  lbl.textContent = label;
+  bar.style.width = barPct + '%';
+}
+
+// ════════════════════════════════════════
+// ANALYZE
+// ════════════════════════════════════════
+async function analyze() {
+  if (!b64 || !apiKey || analyzing) return;
+  analyzing = true;
+  const area = $('answerArea');
+  const btn = $('btnAna');
+  scanLine.classList.add('on');
+  if (btn) btn.disabled = true;
+
+  area.innerHTML = `<div class="answer-card"><div class="ans-head"><span class="ans-tag proc">Analyse</span></div><div class="dots"><span></span><span></span><span></span></div></div>`;
+
+  const prompt = `Tu es un expert ATPL (Airline Transport Pilot License), spécialité : ${SUBJ[subject] || 'ATPL'}.
+
+Analyse cette photo d'une question d'examen ATPL.
+
+INSTRUCTIONS :
+1. Lis et retranscris la question et toutes les options (A, B, C, D)
+2. Identifie la BONNE RÉPONSE
+3. Explique BRIÈVEMENT pourquoi c'est la bonne réponse (2-3 phrases max)
+4. Si c'est du vocabulaire aviation, donne la définition du terme clé
+
+FORMAT :
+📋 QUESTION : [retranscription]
+
+✅ RÉPONSE : [Lettre] — [texte de la réponse]
+
+💡 EXPLICATION : [explication courte]
+
+Si l'image n'est pas une question ATPL, dis-le simplement.`;
+
+  try {
+    // Strategy: try openrouter/free auto-router first (picks best available),
+    // then specific vision models as fallback
+    const models = [
+      'openrouter/free',
+      'qwen/qwen2.5-vl-72b-instruct:free',
+      'qwen/qwen2.5-vl-32b-instruct:free',
+      'meta-llama/llama-4-scout:free',
+      'google/gemma-3-27b-it:free',
+      'moonshotai/kimi-vl-a3b-thinking:free'
+    ];
+    let data = null, errors = [];
+
+    for (const model of models) {
+      try {
+        if (mode === 'auto') setAutoUI('analyzing', `Essai: ${model.split('/').pop()}...`, 50);
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'ATPL Solver'
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }
+            ]}],
+            max_tokens: 1024
+          })
+        });
+        const json = await res.json();
+
+        // Check for valid response
+        if (res.ok && json.choices?.[0]?.message?.content) {
+          data = json;
+          break;
+        }
+
+        // Log detailed error
+        const errMsg = json.error?.message || json.error?.metadata?.raw || `HTTP ${res.status}`;
+        errors.push(`${model}: ${errMsg}`);
+
+        // If rate limited, short pause before next
+        if (res.status === 429 || res.status === 503) {
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      } catch(e) { errors.push(`${model}: ${e.message}`); }
+    }
+
+    if (!data) throw new Error(errors.join('\n\n'));
+    lastAnalyzeTime = Date.now();
+    const text = data.choices[0].message.content;
+    const letter = (text.match(/RÉPONSE\s*:\s*([A-D])/i) || [])[1] || null;
+    const qMatch = text.match(/QUESTION\s*:\s*(.+?)(?=\n|✅)/s);
+
+    hist.unshift({
+      q: qMatch ? qMatch[1].trim().substring(0, 80) : 'Question ATPL',
+      a: letter || '?', text, subject,
+      t: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    });
+    if (hist.length > 100) hist = hist.slice(0, 100);
+    localStorage.setItem('atpl_h', JSON.stringify(hist));
+    renderHist();
+    updateCounter();
+
+    scanLine.classList.remove('on');
+    area.innerHTML = `<div class="answer-card"><div class="ans-head"><span class="ans-tag">Résolu</span>${letter ? `<span class="ans-letter">${letter}</span>` : ''}</div><div class="ans-body"><p>${esc(text)}</p></div></div>`;
+
+  } catch(err) {
+    scanLine.classList.remove('on');
+    area.innerHTML = `<div class="err">${esc(err.message)}</div>`;
+  }
+  if (btn) btn.disabled = false;
+  analyzing = false;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function updateCounter() {
+  const today = hist.filter(h => {
+    const now = new Date();
+    return h.t; // just count all for simplicity
+  }).length;
+  $('counter').textContent = `${hist.length} questions résolues`;
+}
+
+// ════════════════════════════════════════
+// HISTORY
+// ════════════════════════════════════════
+function toggleHist() {
+  $('histBtn').classList.toggle('open');
+  $('histList').classList.toggle('vis');
+}
+
+function renderHist() {
+  const b = $('histBtn'), l = $('histList');
+  if (hist.length > 0 && b) b.style.display = 'flex';
+  updateCounter();
+  if (l) l.innerHTML = hist.map((h, i) =>
+    `<div class="hist-item" onclick="showH(${i})"><div class="hist-item-q">${esc(h.q)}</div><div class="hist-item-a">${h.t} · ${h.subject} · ${h.a}</div></div>`
+  ).join('');
+}
+
+function showH(i) {
+  const h = hist[i];
+  $('answerArea').innerHTML = `<div class="answer-card"><div class="ans-head"><span class="ans-tag">Historique</span><span class="ans-letter">${h.a}</span></div><div class="ans-body"><p>${esc(h.text)}</p></div></div>`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aon // Comportements professionnels</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',Arial,sans-serif; background:#e8e8e8; min-height:100vh; }
+
+.header {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  background:white; border-left:6px solid #cc0000;
+  padding:14px 28px; display:flex; justify-content:space-between; align-items:center;
+  box-shadow:0 1px 4px rgba(0,0,0,0.12);
+}
+.aon { color:#cc0000; font-weight:700; font-size:16px; }
+.header-left { display:flex; align-items:center; gap:10px; font-size:15px; color:#444; }
+#prog { font-size:15px; color:#444; font-weight:500; }
+
+.main { max-width:940px; margin:0 auto; padding:90px 20px 60px; }
+.page-title { text-align:center; font-size:21px; color:#333; font-weight:400; margin-bottom:26px; }
+
+.pair-card { background:white; border-left:6px solid #cc0000; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+.statements-row { display:grid; grid-template-columns:1fr 1px 1fr; min-height:100px; }
+.stmt { padding:26px 32px 14px; font-size:16.5px; color:#333; line-height:1.58; display:flex; align-items:center; }
+.stmt-right { justify-content:flex-end; text-align:right; }
+.stmt-divider { background:#ddd; }
+
+.scale-wrap { padding:4px 28px 24px; }
+.scale-track { position:relative; display:flex; align-items:center; margin-bottom:9px; }
+.scale-line { position:absolute; left:13px; right:13px; height:2px; background:#ccc; z-index:0; }
+.scale-dots { display:flex; justify-content:space-between; width:100%; position:relative; z-index:1; }
+.dot { width:26px; height:26px; border-radius:50%; border:2px solid #bbb; background:white; cursor:pointer; transition:all 0.12s; }
+.dot:hover { border-color:#cc0000; transform:scale(1.1); }
+.dot.sel { background:#444; border-color:#444; }
+.dot.end { width:30px; height:30px; }
+.dot.end.sel { background:#cc0000; border-color:#cc0000; }
+.scale-labels { display:flex; justify-content:space-between; font-size:11.5px; color:#999; padding:0 1px; }
+.mid-labels { display:flex; flex:1; justify-content:space-between; margin:0 16px; }
+
+.nav { display:flex; justify-content:flex-end; margin-top:18px; }
+.btn-next { background:#cc0000; color:white; border:none; padding:11px 42px; font-size:15px; font-weight:500; cursor:pointer; opacity:0.3; pointer-events:none; transition:opacity 0.18s; }
+.btn-next.on { opacity:1; pointer-events:all; }
+.btn-next.on:hover { background:#aa0000; }
+
+/* SPLASH */
+.splash { position:fixed; inset:0; background:white; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; z-index:300; }
+.splash-logo { font-size:32px; color:#cc0000; font-weight:700; }
+.splash-sub { font-size:14px; color:#999; letter-spacing:.02em; }
+.splash-bar-wrap { width:280px; height:4px; background:#eee; border-radius:2px; overflow:hidden; }
+.splash-bar { height:100%; background:#cc0000; border-radius:2px; transition:width 0.4s ease; width:0%; }
+.splash-status { font-size:12px; color:#aaa; text-align:center; min-height:18px; }
+.splash-count { font-size:11px; color:#bbb; }
+
+.gen-overlay { display:none; position:fixed; bottom:24px; right:24px; background:white; border:1px solid #ddd; border-left:4px solid #cc0000; padding:10px 16px; font-size:12px; color:#888; gap:8px; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,.1); z-index:200; }
+.gen-overlay.show { display:flex; }
+.mini-spin { width:14px; height:14px; border-radius:50%; border:2px solid #eee; border-top-color:#cc0000; animation:spin .7s linear infinite; flex-shrink:0; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* RESULTS */
+.res-wrap { max-width:720px; margin:80px auto 40px; padding:0 20px; }
+.res-card { background:white; border-left:6px solid #cc0000; padding:26px 30px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.big-score { font-size:50px; font-weight:700; text-align:center; }
+.score-lbl { font-size:11px; color:#999; text-transform:uppercase; letter-spacing:.1em; text-align:center; margin-bottom:4px; }
+.score-sub { font-size:12px; color:#aaa; text-align:center; margin-top:2px; }
+.bar-row { margin-bottom:13px; }
+.bar-lbl { display:flex; justify-content:space-between; font-size:13px; color:#555; margin-bottom:5px; }
+.bar-bg { height:8px; background:#eee; border-radius:4px; position:relative; overflow:visible; }
+.bar-fill { height:100%; border-radius:4px; transition:width 1.2s ease; }
+.bar-marker { position:absolute; top:-5px; width:2px; height:18px; background:#cc0000; transform:translateX(-50%); }
+.bar-marker-lbl { position:absolute; top:14px; transform:translateX(-50%); font-size:10px; color:#cc0000; white-space:nowrap; }
+.a-line { font-size:14px; margin-bottom:10px; line-height:1.55; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span>☰</span><span class="aon">Aon</span>
+    <span style="color:#ccc">//</span>
+    <span>Comportements professionnels</span>
+  </div>
+  <div id="prog">0%</div>
+</div>
+
+<div id="splash" class="splash">
+  <div class="splash-logo">Aon</div>
+  <div class="splash-sub">Préparation de votre session personnalisée</div>
+  <div class="splash-bar-wrap"><div class="splash-bar" id="splashBar"></div></div>
+  <div class="splash-status" id="splashStatus">Initialisation…</div>
+  <div class="splash-count" id="splashCount"></div>
+</div>
+
+<div class="gen-overlay" id="genOverlay">
+  <div class="mini-spin"></div>
+  <span>Génération adaptative en cours…</span>
+</div>
+
+<div id="app"></div>
+
+<script>
+const API_KEY = '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';
+const MODEL   = 'anthropic/claude-3-haiku';
+const TOTAL   = 40;
+const SESSION = Math.random().toString(36).slice(2,10);
+
+// ── TRAITS ──────────────────────────────────────────────────────────────────
+const T = {
+  composure:       { name:'Maîtrise émotionnelle',  fam:'R', score:50, n:0, bench:78 },
+  positivity:      { name:'Optimisme',              fam:'R', score:50, n:0, bench:68 },
+  confidence:      { name:'Confiance en soi',       fam:'R', score:50, n:0, bench:66 },
+  cooperativeness: { name:'Coopération',            fam:'O', score:50, n:0, bench:72 },
+  mastery:         { name:'Accepter la correction', fam:'O', score:50, n:0, bench:70 },
+  directness:      { name:'Assertivité',            fam:'O', score:50, n:0, bench:68 },
+  adaptability:    { name:'Adaptabilité',           fam:'O', score:50, n:0, bench:64 },
+  empathy:         { name:'Empathie',               fam:'O', score:50, n:0, bench:60 },
+  structure:       { name:'Rigueur',                fam:'Y', score:50, n:0, bench:71 },
+  drive:           { name:'Exigence personnelle',   fam:'Y', score:50, n:0, bench:65 },
+  persistence:     { name:'Persistance',            fam:'Y', score:50, n:0, bench:67 },
+  rulebased:       { name:'Respect des règles',     fam:'Y', score:50, n:0, bench:74 },
+  sociability:     { name:'Sociabilité',            fam:'G', score:50, n:0, bench:55 },
+  ambition:        { name:'Ambition',               fam:'G', score:50, n:0, bench:57 },
+  innovation:      { name:'Innovation',             fam:'G', score:50, n:0, bench:52 },
+};
+
+const FAM = {
+  R:{ name:'Composure & Stabilité',    color:'#cc0000', bench:75 },
+  O:{ name:'CRM & Coopération',        color:'#e06820', bench:68 },
+  Y:{ name:'Rigueur & Structure',      color:'#b09000', bench:69 },
+  G:{ name:'Ambition & Innovation',    color:'#508050', bench:55 },
+};
+
+const S = { pairs:[], used:new Set(), responses:[], coherenceErrs:0, generating:false };
+
+// ── AI GENERATION ────────────────────────────────────────────────────────────
+// Each batch has a specific focus to ensure full coverage of all trait combinations
+const BATCH_SPECS = [
+  {
+    label: "batch A — Composure vs autres",
+    count: 14,
+    instructions: `Focus sur:
+- 5× Composure/Positivity/Confidence (🔴) vs Cooperativeness/Mastery/Directness (🟠)
+- 3× Composure (🔴) vs Structure/Drive/Rulebased (🟡)  
+- 2× Composure (🔴) vs Ambition/Innovation (🟢)
+- 2× paires intra-🔴 (même famille, deux statements Composure différents)
+- 1× piège never/always (dir:0)
+- 1× inversion négative (dir:-1)`,
+  },
+  {
+    label: "batch B — CRM vs Rigueur + intra",
+    count: 14,
+    instructions: `Focus sur:
+- 4× Cooperativeness/Mastery/Directness (🟠) vs Structure/Drive/Rulebased (🟡)
+- 3× CRM (🟠) vs Ambition/Innovation (🟢)
+- 2× Rigueur (🟡) vs Ambition (🟢)
+- 2× paires intra-🟠 (assertivité vs coopération, accepter correction vs directness)
+- 2× paires intra-🟡 (drive vs structure)
+- 1× inversion négative (dir:-1)`,
+  },
+  {
+    label: "batch C — Assertivité, dominance, cohérence",
+    count: 14,
+    instructions: `Focus sur:
+- 3× assertivité légitime (CRM safety) vs dominance sociale — statements subtils où l'un est fort et l'autre trop dominant
+- 3× Empathy/Adaptability vs Structure/Rulebased — tests de flexibilité
+- 2× reformulations inversées pour test cohérence (dir:-1) — reformuler un trait positif déjà testé en négatif
+- 2× pièges "trop parfait" (never/always, dir:0)
+- 2× Sociability/Ambition vs Cooperativeness — frontière entre ego et CRM
+- 2× situations concrètes avec pression temporelle ou hiérarchique`,
+  },
+];
+
+async function genBatch(spec, batchIdx) {
+  const batchSeed = `${SESSION}_${batchIdx}`;
+  const prompt = `Tu génères exactement ${spec.count} paires ipsatives pour un test psychométrique ADEPT-15 de sélection professionnelle. Seed: ${batchSeed}
+
+${spec.instructions}
+
+RÈGLES ABSOLUES:
+- Les deux statements doivent sembler positifs/souhaitables en contexte professionnel
+- Formulation en FRANÇAIS, style professionnel neutre (jamais de vocabulaire aviation explicite)
+- Chaque paire oppose deux traits différents (sauf intra-famille explicitement demandé)
+- Les statements d'inversion (dir:-1) doivent sembler honnêtes et réalistes, pas extrêmes
+- Les pièges (dir:0) contiennent "toujours" ou "jamais" ou impliquent la perfection absolue
+- Seed unique garantit formulations 100% différentes de toute session précédente
+- Longueur des statements: 10-20 mots, naturels, à la première personne
+
+TRAITS VALIDES UNIQUEMENT: composure, positivity, confidence, cooperativeness, mastery, directness, adaptability, empathy, structure, drive, persistence, rulebased, sociability, ambition, innovation
+
+RETOURNE UNIQUEMENT un JSON array valide, zéro markdown, zéro texte avant ou après:
+[{"id":"${batchSeed}_1","L":{"t":"composure","dir":1,"tx":"statement gauche en français"},"R":{"t":"cooperativeness","dir":1,"tx":"statement droite en français"}}]`;
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Authorization':`Bearer ${API_KEY}`, 'Content-Type':'application/json', 'HTTP-Referer':'https://localhost' },
+    body: JSON.stringify({ model:MODEL, messages:[{role:'user',content:prompt}], max_tokens:3500, temperature:0.88 })
+  });
+  const data = await res.json();
+  const txt = data.choices[0].message.content.replace(/```json|```/g,'').trim();
+  return JSON.parse(txt);
+}
+
+async function genAllBatches() {
+  const bar = document.getElementById('splashBar');
+  const status = document.getElementById('splashStatus');
+  const count = document.getElementById('splashCount');
+
+  status.textContent = 'Génération des 40 questions en cours…';
+
+  let total = 0;
+  const results = await Promise.allSettled(
+    BATCH_SPECS.map(async (spec, idx) => {
+      const pairs = await genBatch(spec, idx);
+      total += pairs.length;
+      const pct = Math.round(total / 42 * 100);
+      bar.style.width = Math.min(pct, 95) + '%';
+      count.textContent = `${total} paires générées`;
+      return pairs;
+    })
+  );
+
+  const allPairs = results
+    .filter(r => r.status === 'fulfilled')
+    .flatMap(r => r.value);
+
+  // Deduplicate by id
+  const seen = new Set();
+  S.pairs = allPairs.filter(p => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id); return true;
+  });
+
+  bar.style.width = '100%';
+  status.textContent = `Session prête — ${S.pairs.length} paires uniques`;
+  count.textContent = `Session ID: ${SESSION}`;
+
+  await new Promise(r => setTimeout(r, 600));
+}
+
+// ── ADAPTIVE REFILL ──────────────────────────────────────────────────────────
+async function adaptiveRefill() {
+  if (S.generating) return;
+  S.generating = true;
+  document.getElementById('genOverlay').classList.add('show');
+
+  const least = Object.entries(T).sort((a,b)=>a[1].n-b[1].n).slice(0,6).map(([k])=>k);
+  const stateStr = Object.entries(T).map(([k,v])=>`${v.name}:${v.score}(n=${v.n})`).join(', ');
+  const refillSeed = `${SESSION}_refill_${Date.now()}`;
+
+  const prompt = `Génère 8 paires ipsatives ADEPT-15 adaptatives. Seed: ${refillSeed}
+
+Scores actuels: ${stateStr}
+Traits prioritaires (moins échantillonnés): ${least.join(', ')}
+
+Génère des paires qui ciblent spécifiquement ces traits sous-représentés.
+Inclure: 1 inversion (dir:-1), 1 piège (dir:0), 6 paires normales (dir:1).
+Format identique, JSON array uniquement, français, zéro markdown.
+
+TRAITS VALIDES: composure, positivity, confidence, cooperativeness, mastery, directness, adaptability, empathy, structure, drive, persistence, rulebased, sociability, ambition, innovation
+
+[{"id":"${refillSeed}_1","L":{"t":"trait","dir":1,"tx":"statement"},"R":{"t":"trait","dir":1,"tx":"statement"}}]`;
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST',
+      headers:{ 'Authorization':`Bearer ${API_KEY}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ model:MODEL, messages:[{role:'user',content:prompt}], max_tokens:2000, temperature:0.9 })
+    });
+    const data = await res.json();
+    const txt = data.choices[0].message.content.replace(/```json|```/g,'').trim();
+    const newPairs = JSON.parse(txt);
+    S.pairs.push(...newPairs);
+  } catch(e) { console.warn('Refill failed:', e); }
+  finally {
+    S.generating = false;
+    document.getElementById('genOverlay').classList.remove('show');
+  }
+}
+
+// ── IRT SCORING ──────────────────────────────────────────────────────────────
+function applyResponse(pairId, val) {
+  const pair = S.pairs.find(p=>p.id===pairId);
+  if (!pair) return;
+
+  const leftStr  = (8 - val) / 7;
+  const rightStr = (val - 1) / 7;
+
+  const update = (key, dir, strength) => {
+    if (!T[key]) return;
+    let impact;
+    if (dir === 0) {
+      // Trap: penalise extreme responses
+      impact = strength > 0.85 ? 20 : strength > 0.7 ? 45 : strength * 100;
+    } else if (dir === 1) {
+      impact = strength * 100;
+    } else {
+      // Inversion: high agreement with negative = low trait
+      impact = (1 - strength) * 100;
+    }
+    const lr = 0.6 / (T[key].n + 1);
+    T[key].score = Math.max(5, Math.min(95, Math.round(T[key].score + lr * (impact - T[key].score))));
+    T[key].n++;
+  };
+
+  update(pair.L.t, pair.L.dir, leftStr);
+  update(pair.R.t, pair.R.dir, rightStr);
+
+  // Coherence check for inversions
+  if (pair.L.dir === -1 || pair.R.dir === -1) {
+    const invTrait = pair.L.dir === -1 ? pair.L.t : pair.R.t;
+    const invStr   = pair.L.dir === -1 ? leftStr : rightStr;
+    S.responses.filter(r => {
+      const p = S.pairs.find(x=>x.id===r.pairId);
+      return p && p.L.dir===1 && p.R.dir===1 &&
+             (p.L.t===invTrait || p.R.t===invTrait);
+    }).forEach(r => {
+      const p = S.pairs.find(x=>x.id===r.pairId);
+      const posStr = p.L.t===invTrait ? (8-r.val)/7 : (r.val-1)/7;
+      if (posStr > 0.6 && invStr > 0.6) S.coherenceErrs++;
+    });
+  }
+
+  S.used.add(pairId);
+  S.responses.push({ pairId, val });
+}
+
+// ── SELECT ADAPTIVE PAIR ─────────────────────────────────────────────────────
+function selectNext(n=2) {
+  const avail = S.pairs.filter(p => !S.used.has(p.id));
+  const traitsByN = Object.entries(T).sort((a,b)=>a[1].n-b[1].n);
+  const leastSet = new Set(traitsByN.slice(0,8).map(([k])=>k));
+
+  const scored = avail.map(p => {
+    let s = 0;
+    if (leastSet.has(p.L.t)) s += (8 - (T[p.L.t]?.n||0));
+    if (leastSet.has(p.R.t)) s += (8 - (T[p.R.t]?.n||0));
+    // slightly randomize to avoid always same order
+    s += Math.random() * 2;
+    return { p, s };
+  }).sort((a,b)=>b.s-a.s);
+
+  return scored.slice(0, n).map(x=>x.p);
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+let curPairs=[], curAns={};
+
+function setProgress() {
+  document.getElementById('prog').textContent =
+    Math.round(S.responses.length/TOTAL*100)+'%';
+}
+
+function renderPairs(pairs) {
+  curPairs=pairs; curAns={};
+  document.getElementById('app').innerHTML = `
+    <div class="main">
+      <p class="page-title">Avec laquelle de ces affirmations vous identifiez-vous le plus ?</p>
+      ${pairs.map(renderCard).join('')}
+      <div class="nav">
+        <button class="btn-next" id="btnNext" onclick="onNext()">Suivant</button>
+      </div>
+    </div>`;
+}
+
+function renderCard(p) {
+  return `<div class="pair-card">
+    <div class="statements-row">
+      <div class="stmt">${p.L.tx}</div>
+      <div class="stmt-divider"></div>
+      <div class="stmt stmt-right">${p.R.tx}</div>
+    </div>
+    <div class="scale-wrap">
+      <div class="scale-track">
+        <div class="scale-line"></div>
+        <div class="scale-dots">
+          ${[1,2,3,4,5,6,7].map(v=>`
+            <div class="dot${v===1||v===7?' end':''}" id="d_${p.id}_${v}" onclick="pick('${p.id}',${v})"></div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="scale-labels">
+        <span>Tout à fait d'accord</span>
+        <div class="mid-labels"><span>Plutôt d'accord</span><span>Plutôt d'accord</span></div>
+        <span>Tout à fait d'accord</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function pick(pairId, val) {
+  for(let v=1;v<=7;v++){
+    const el=document.getElementById(`d_${pairId}_${v}`);
+    if(el) el.classList.toggle('sel', v===val);
+  }
+  curAns[pairId]=val;
+  const done=curPairs.every(p=>curAns[p.id]!==undefined);
+  const btn=document.getElementById('btnNext');
+  if(btn) btn.classList.toggle('on', done);
+}
+
+async function onNext() {
+  curPairs.forEach(p=>{ if(curAns[p.id]!==undefined) applyResponse(p.id,curAns[p.id]); });
+  setProgress();
+
+  if(S.responses.length>=TOTAL){ renderResults(); return; }
+
+  const remaining = S.pairs.filter(p=>!S.used.has(p.id)).length;
+  if(remaining < 8 && !S.generating) adaptiveRefill();
+  if(remaining < 2) await adaptiveRefill();
+
+  const next=selectNext(2);
+  if(!next.length){ renderResults(); return; }
+  renderPairs(next);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── RESULTS ──────────────────────────────────────────────────────────────────
+function famScore(fam){
+  const keys=Object.keys(T).filter(k=>T[k].fam===fam);
+  return Math.round(keys.reduce((s,k)=>s+T[k].score,0)/keys.length);
+}
+
+function renderResults(){
+  document.getElementById('prog').textContent='100%';
+  const fs=Object.fromEntries(Object.entries(FAM).map(([k,f])=>([k,{...f,score:famScore(k)}])));
+  const fitVals=Object.entries(fs).map(([,f])=>Math.max(0,100-Math.abs(f.score-f.bench)*1.5));
+  const fit=Math.round(fitVals.reduce((a,b)=>a+b,0)/fitVals.length);
+  const coherence=Math.max(15,Math.round(100-S.coherenceErrs*14));
+  const fitColor=fit>=75?'#2a8a2a':fit>=55?'#c07800':'#cc0000';
+  const cohColor=coherence>=75?'#2a8a2a':coherence>=55?'#c07800':'#cc0000';
+
+  document.getElementById('app').innerHTML=`
+    <div class="res-wrap">
+      <div class="res-card">
+        <p style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px">
+          Évaluation terminée · ${S.responses.length} items · Session ${SESSION}
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <p class="score-lbl">Adéquation profil</p>
+            <p class="big-score" style="color:${fitColor}">${fit}%</p>
+            <p class="score-sub">benchmark Ryanair FO</p>
+          </div>
+          <div>
+            <p class="score-lbl">Index de cohérence</p>
+            <p class="big-score" style="color:${cohColor}">${coherence}</p>
+            <p class="score-sub">consistance des réponses</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="res-card">
+        <p style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px">
+          Dimensions principales · score vs benchmark Ryanair FO
+        </p>
+        ${Object.entries(fs).map(([,f])=>`
+          <div class="bar-row">
+            <div class="bar-lbl">
+              <span style="font-weight:600;color:${f.color}">${f.name}</span>
+              <span style="color:#aaa">${f.score}/100 <span style="color:${f.color}">cible: ${f.bench}</span></span>
+            </div>
+            <div class="bar-bg">
+              <div class="bar-fill" style="width:${f.score}%;background:${f.color};opacity:.6"></div>
+              <div class="bar-marker" style="left:${f.bench}%"><span class="bar-marker-lbl">cible</span></div>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div class="res-card">
+        <p style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px">Traits individuels (15)</p>
+        ${Object.entries(T).map(([,t])=>`
+          <div class="bar-row">
+            <div class="bar-lbl">
+              <span style="color:#555;font-size:12px">${t.name}</span>
+              <span style="color:#bbb;font-size:11px">${t.score}/100 · ${t.n} items</span>
+            </div>
+            <div class="bar-bg">
+              <div class="bar-fill" style="width:${t.score}%;background:${FAM[t.fam].color};opacity:.4"></div>
+              <div class="bar-marker" style="left:${t.bench}%"></div>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div class="res-card">
+        <p style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">Analyse</p>
+        ${buildAnalysis(fs,coherence)}
+      </div>
+
+      <div style="text-align:center;margin-top:24px;margin-bottom:40px">
+        <button onclick="location.reload()"
+          style="background:#cc0000;color:white;border:none;padding:12px 44px;font-size:15px;cursor:pointer;">
+          Nouvelle session
+        </button>
+      </div>
+    </div>`;
+}
+
+function buildAnalysis(fs,coh){
+  const ok  =t=>`<p class="a-line" style="color:#2a8a2a">✓ ${t}</p>`;
+  const warn=t=>`<p class="a-line" style="color:#cc0000">⚠ ${t}</p>`;
+  const mid =t=>`<p class="a-line" style="color:#c07800">→ ${t}</p>`;
+  const lines=[];
+  const R=fs.R,O=fs.O,Y=fs.Y,G=fs.G;
+  lines.push(R.score>=R.bench-8
+    ?ok(`<strong>Composure</strong> : dans la zone cible (${R.score}). Stabilité émotionnelle validée.`)
+    :warn(`<strong>Composure</strong> : sous le benchmark (${R.score} vs ${R.bench}). Axe prioritaire avant repassage.`));
+  lines.push(O.score>=O.bench-8
+    ?ok(`<strong>CRM & Coopération</strong> : signal collaboratif solide (${O.score}).`)
+    :warn(`<strong>CRM & Coopération</strong> : insuffisant pour FO LCC (${O.score} vs ${O.bench}).`));
+  lines.push(Y.score>=Y.bench-8
+    ?ok(`<strong>Rigueur & Structure</strong> : procédurier dans les normes Ryanair (${Y.score}).`)
+    :warn(`<strong>Rigueur & Structure</strong> : trop faible pour opérateur process-driven (${Y.score} vs ${Y.bench}).`));
+  lines.push(G.score>68
+    ?mid(`<strong>Ambition & Innovation</strong> : score élevé (${G.score}) — surveiller le risque profil individualiste.`)
+    :ok(`<strong>Ambition & Innovation</strong> : zone acceptable pour un FO (${G.score}).`));
+  lines.push(coh<60
+    ?warn(`<strong>Cohérence</strong> : incohérences détectées (${coh}/100) — risque flag algorithme AON.`)
+    :ok(`<strong>Cohérence</strong> : profil consistant (${coh}/100). Pas de signal de falsification.`));
+  const verdict=R.score>=65&&O.score>=60&&Y.score>=60&&coh>=65;
+  lines.push(verdict
+    ?`<p class="a-line" style="color:#2a8a2a;font-weight:700;border-top:1px solid #eee;padding-top:10px;margin-top:6px">✓ Profil compatible Ryanair FO — bonne base pour le repassage</p>`
+    :`<p class="a-line" style="color:#cc0000;font-weight:700;border-top:1px solid #eee;padding-top:10px;margin-top:6px">⚠ Dimensions sous benchmark — identifier les axes avant repassage</p>`);
+  return lines.join('');
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(async function init(){
+  await genAllBatches();
+  document.getElementById('splash').style.display='none';
+  renderPairs(selectNext(2));
+  setProgress();
+})();
+</script>
+</body>
+</html>

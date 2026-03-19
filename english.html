@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ATPL Speed Solver</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=DM+Sans:wght@400;600;700&display=swap');
+  :root {
+    --bg:#080b12;--card:#131a28;--accent:#00ffab;--dim:#00ffab18;
+    --text:#e8edf5;--text2:#6b7a90;--border:#1e2a3d;--red:#ff3b5c;--warn:#ffa600;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden}
+
+  /* Big answer overlay */
+  .big-answer{
+    display:none;position:fixed;top:0;left:0;right:0;
+    z-index:200;padding:10px 16px;
+    background:linear-gradient(180deg,#00ffab22 0%,transparent 100%);
+    pointer-events:none;text-align:center;
+    animation:fadeDown .25s ease;
+  }
+  .big-answer.show{display:block}
+  .big-letter{
+    font-family:'JetBrains Mono',monospace;font-size:72px;font-weight:800;
+    color:var(--accent);text-shadow:0 0 40px #00ffab60;line-height:1;
+  }
+  .big-sub{font-size:13px;color:var(--accent);font-family:'JetBrains Mono',monospace;opacity:0.7;margin-top:2px}
+  @keyframes fadeDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--border);
+  }
+  .topbar-left{display:flex;align-items:center;gap:8px}
+  .logo{
+    width:26px;height:26px;background:var(--accent);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    font:700 12px 'JetBrains Mono',monospace;color:var(--bg);
+  }
+  .topbar h1{font:600 13px 'JetBrains Mono',monospace}
+  .topbar-btn{
+    background:none;border:1px solid var(--border);border-radius:6px;
+    color:var(--text2);padding:4px 8px;cursor:pointer;
+    font:500 10px 'JetBrains Mono',monospace;
+  }
+  .stats{
+    display:flex;gap:12px;font:500 10px 'JetBrains Mono',monospace;color:var(--text2);
+    padding:0 4px;
+  }
+  .stats span{color:var(--accent)}
+
+  .container{padding:52px 10px 20px;max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+
+  /* Setup */
+  .setup{
+    display:flex;flex-direction:column;gap:14px;padding:20px;margin-top:12px;
+    background:var(--card);border:1px solid var(--border);border-radius:12px;
+  }
+  .setup h2{font:600 15px 'JetBrains Mono',monospace}
+  .setup p{font-size:12px;color:var(--text2);line-height:1.5}
+  .setup a{color:var(--accent)}
+  .setup-input{
+    width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);
+    border-radius:7px;color:var(--text);font:12px 'JetBrains Mono',monospace;outline:none;
+  }
+  .setup-input:focus{border-color:var(--accent)}
+
+  /* Camera */
+  .cam{
+    position:relative;border-radius:12px;overflow:hidden;
+    border:1px solid var(--border);background:var(--card);aspect-ratio:16/10;
+    transition:border-color .3s,box-shadow .3s;
+  }
+  .cam.live{border-color:var(--accent);box-shadow:0 0 20px #00ffab15}
+  .cam.scanning{border-color:var(--warn);box-shadow:0 0 20px #ffa60020}
+  .cam video{width:100%;height:100%;object-fit:cover;display:block}
+  .cam canvas{display:none}
+  .cam-overlay{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;background:var(--card);gap:8px;
+    transition:opacity .2s;
+  }
+  .cam-overlay.hid{opacity:0;pointer-events:none}
+  .cam-overlay svg{width:36px;height:36px;color:var(--text2)}
+  .cam-overlay span{font:12px 'JetBrains Mono',monospace;color:var(--text2)}
+
+  .scan-bar{
+    position:absolute;bottom:0;left:0;height:3px;background:var(--accent);
+    border-radius:2px;transition:width .3s;
+  }
+
+  /* Status strip */
+  .status-strip{
+    display:flex;align-items:center;gap:8px;padding:8px 12px;
+    background:var(--card);border:1px solid var(--border);border-radius:8px;
+    font:11px 'JetBrains Mono',monospace;color:var(--text2);
+  }
+  .status-dot{
+    width:7px;height:7px;border-radius:50%;flex-shrink:0;
+    transition:background .2s;
+  }
+  .status-dot.idle{background:var(--text2)}
+  .status-dot.watching{background:var(--accent);animation:pulse .8s ease infinite}
+  .status-dot.change{background:var(--warn);animation:pulse .4s ease infinite}
+  .status-dot.api{background:var(--warn);animation:spin .6s linear infinite}
+  @keyframes pulse{50%{opacity:.3}}
+  @keyframes spin{50%{transform:scale(1.5);opacity:.4}}
+  .status-label{flex:1}
+  .status-timer{color:var(--accent)}
+
+  /* Controls */
+  .ctrls{display:flex;gap:6px}
+  .btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
+    padding:10px 14px;border-radius:8px;border:none;
+    font:600 12px 'DM Sans',sans-serif;cursor:pointer;transition:all .15s;
+  }
+  .btn svg{width:14px;height:14px}
+  .btn-p{background:var(--accent);color:var(--bg)}
+  .btn-p:active{transform:scale(.97)}
+  .btn-p:disabled{opacity:.3}
+  .btn-s{background:var(--card);color:var(--text);border:1px solid var(--border)}
+  .btn-auto{background:var(--dim);color:var(--accent);border:1px solid var(--accent)}
+  .btn-auto.active{background:var(--accent);color:var(--bg)}
+
+  /* Answer stream */
+  .answers{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow-y:auto}
+  .ans{
+    display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
+    background:var(--card);border:1px solid var(--border);border-radius:8px;
+    animation:slideIn .2s ease;
+  }
+  @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}}
+  .ans-letter-sm{
+    font:800 24px 'JetBrains Mono',monospace;color:var(--accent);
+    min-width:32px;text-align:center;line-height:1;padding-top:2px;
+  }
+  .ans-text{font-size:12px;line-height:1.5;color:var(--text2);flex:1}
+  .ans-time{font:10px 'JetBrains Mono',monospace;color:var(--text2);opacity:.5;white-space:nowrap}
+  .ans-err{color:var(--red);font:11px 'JetBrains Mono',monospace;padding:8px 12px;background:#ff3b5c10;border-radius:8px;border:1px solid #ff3b5c30}
+
+  #fileInput{display:none}
+  .upload-link{font:11px 'JetBrains Mono',monospace;color:var(--accent);cursor:pointer;text-decoration:underline;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="big-answer" id="bigAnswer">
+  <div class="big-letter" id="bigLetter">B</div>
+  <div class="big-sub" id="bigSub"></div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">A</div>
+    <h1>SPEED SOLVER</h1>
+  </div>
+  <button class="topbar-btn" id="settingsBtn" onclick="showSetup()" style="display:none">API</button>
+</div>
+
+<div class="container">
+  <!-- Setup -->
+  <div id="setupScreen" class="setup">
+    <h2>Setup — 30 secondes</h2>
+    <p>1. <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> → crée un compte<br>
+       2. Crée une API key → colle-la ici</p>
+    <input type="text" id="apiKeyInput" class="setup-input" placeholder="sk-or-..." autocomplete="off" spellcheck="false">
+    <button class="btn btn-p" onclick="saveKey()">Go</button>
+  </div>
+
+  <!-- Main -->
+  <div id="main" style="display:none">
+    <div class="stats">
+      <div>Résolues: <span id="countSolved">0</span></div>
+      <div>Vitesse: <span id="avgSpeed">-</span></div>
+    </div>
+
+    <div class="cam" id="cam">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="scan-bar" id="scanBar"></div>
+      <div class="cam-overlay" id="overlay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Tap pour démarrer</span>
+      </div>
+    </div>
+
+    <div class="status-strip" id="statusStrip">
+      <div class="status-dot idle" id="sDot"></div>
+      <span class="status-label" id="sLabel">Prêt</span>
+      <span class="status-timer" id="sTimer"></span>
+    </div>
+
+    <div class="ctrls">
+      <button class="btn btn-p" id="btnStart" onclick="startCam()">Démarrer caméra</button>
+      <button class="btn btn-auto" id="btnAuto" onclick="toggleAuto()" style="display:none">AUTO</button>
+      <button class="btn btn-s" id="btnFlip" onclick="flipCam()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      </button>
+    </div>
+
+    <label class="upload-link" for="fileInput">ou importer une photo</label>
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFile(event)">
+
+    <div class="answers" id="answers"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════
+const SCAN_INTERVAL = 500;     // Check every 500ms
+const CHANGE_THRESH = 3;       // 3% pixels changed = new question
+const PIXEL_SENS = 15;         // Per-pixel diff threshold
+const STABLE_FRAMES = 1;       // 1 stable frame (500ms) then fire
+const COOLDOWN = 3000;         // 3s between API calls
+const IMG_MAX = 600;           // Max image dimension
+const IMG_QUALITY = 0.4;       // JPEG quality
+const THUMB = 96;              // Detection thumbnail size
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let apiKey = localStorage.getItem('or_key') || '';
+let stream = null, facing = 'environment';
+let autoMode = false, analyzing = false;
+let autoTimer = null, lastApiTime = 0, modelIdx = 0;
+let prevFrame = null, stableCount = 0, changed = false;
+let solvedCount = 0, totalTime = 0;
+
+const $ = id => document.getElementById(id);
+const video = $('video'), canvas = $('canvas');
+
+const MODELS = [
+  'openrouter/free',                              // Auto-router, picks best available with vision
+  'openrouter/healer-alpha',                       // Frontier omni-modal with vision, FREE
+  'openrouter/hunter-alpha',                       // 1T params, vision, FREE
+  'qwen/qwen2.5-vl-72b-instruct:free',            // Best vision quality
+  'qwen/qwen2.5-vl-32b-instruct:free',            // Fast vision
+  'moonshotai/kimi-vl-a3b-thinking:free',          // Vision + reasoning
+  'meta-llama/llama-4-scout:free',                 // Multimodal 10M context
+  'google/gemma-3-27b-it:free',                    // Vision + 140 languages
+  'mistralai/mistral-small-3.1-24b-instruct:free'  // Vision + fast
+];
+
+if (apiKey) initApp();
+
+function initApp() {
+  $('setupScreen').style.display = 'none';
+  $('main').style.display = 'flex';
+  $('main').style.flexDirection = 'column';
+  $('main').style.gap = '8px';
+  $('settingsBtn').style.display = 'block';
+}
+
+function saveKey() {
+  const k = $('apiKeyInput').value.trim();
+  if (!k) return;
+  apiKey = k; localStorage.setItem('or_key', k); initApp();
+}
+function showSetup() {
+  $('setupScreen').style.display = 'flex';
+  $('main').style.display = 'none';
+  $('apiKeyInput').value = apiKey;
+}
+
+// ═══════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════
+async function startCam() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 800 } }
+    });
+    video.srcObject = stream;
+    $('overlay').classList.add('hid');
+    $('btnStart').style.display = 'none';
+    $('btnAuto').style.display = 'flex';
+    $('btnFlip').style.display = 'flex';
+    $('cam').classList.add('live');
+    setStatus('watching', 'Caméra active — appuie AUTO', '');
+  } catch(e) { setStatus('idle', 'Caméra inaccessible', ''); }
+}
+
+function flipCam() {
+  facing = facing === 'environment' ? 'user' : 'environment';
+  startCam();
+}
+
+// ═══════════════════════════════════════
+// AUTO MODE
+// ═══════════════════════════════════════
+function toggleAuto() {
+  autoMode = !autoMode;
+  $('btnAuto').classList.toggle('active', autoMode);
+  $('cam').classList.toggle('live', !autoMode);
+
+  if (autoMode) {
+    prevFrame = null; stableCount = 0; changed = false;
+    setStatus('watching', 'AUTO — en attente de question...', '');
+    autoTimer = setInterval(scanTick, SCAN_INTERVAL);
+  } else {
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = null;
+    setStatus('idle', 'Auto désactivé', '');
+    $('cam').classList.add('live');
+    $('cam').classList.remove('scanning');
+  }
+}
+
+function scanTick() {
+  if (analyzing || !stream || !video.videoWidth) return;
+
+  // Cooldown display
+  const since = Date.now() - lastApiTime;
+  if (since < COOLDOWN && lastApiTime > 0) {
+    const s = ((COOLDOWN - since) / 1000).toFixed(1);
+    setStatus('watching', `Cooldown...`, `${s}s`);
+    $('scanBar').style.width = (since / COOLDOWN * 100) + '%';
+    return;
+  }
+  $('scanBar').style.width = '0%';
+
+  // Thumbnail capture
+  const t = document.createElement('canvas');
+  t.width = THUMB; t.height = THUMB;
+  const ctx = t.getContext('2d');
+  ctx.drawImage(video, 0, 0, THUMB, THUMB);
+  const cur = ctx.getImageData(0, 0, THUMB, THUMB).data;
+
+  if (!prevFrame) { prevFrame = cur; return; }
+
+  const diff = pxDiff(prevFrame, cur);
+  prevFrame = cur;
+
+  if (diff > CHANGE_THRESH) {
+    changed = true; stableCount = 0;
+    $('cam').classList.add('scanning');
+    setStatus('change', `Changement ${diff.toFixed(0)}%`, '');
+  } else if (changed) {
+    stableCount++;
+    if (stableCount >= STABLE_FRAMES) {
+      changed = false; stableCount = 0;
+      $('cam').classList.remove('scanning');
+      fireAnalysis();
+    } else {
+      setStatus('change', 'Stabilisation...', '');
+    }
+  } else {
+    setStatus('watching', 'Scan...', '');
+  }
+}
+
+function pxDiff(a, b) {
+  let d = 0;
+  const n = a.length / 4;
+  for (let i = 0; i < a.length; i += 4) {
+    if ((Math.abs(a[i]-b[i]) + Math.abs(a[i+1]-b[i+1]) + Math.abs(a[i+2]-b[i+2])) / 3 > PIXEL_SENS) d++;
+  }
+  return (d / n) * 100;
+}
+
+// ═══════════════════════════════════════
+// IMAGE COMPRESSION
+// ═══════════════════════════════════════
+function grabFrame() {
+  let w = video.videoWidth, h = video.videoHeight;
+  if (w > h) { if (w > IMG_MAX) { h = Math.round(h * IMG_MAX / w); w = IMG_MAX; } }
+  else { if (h > IMG_MAX) { w = Math.round(w * IMG_MAX / h); h = IMG_MAX; } }
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', IMG_QUALITY).split(',')[1];
+}
+
+// ═══════════════════════════════════════
+// PARALLEL API — RACE 4 MODELS
+// ═══════════════════════════════════════
+async function fireAnalysis() {
+  if (analyzing || !apiKey) return;
+  analyzing = true;
+  const t0 = Date.now();
+  setStatus('api', 'Analyse...', '');
+
+  const b64 = grabFrame();
+  const prompt = `Look at this exam question photo. Give ONLY:
+1. The correct answer letter (A, B, C, or D)
+2. One short sentence why
+
+Format exactly:
+ANSWER: X
+WHY: ...`;
+
+  try {
+    // Pick 4 different models and race them
+    const picks = [];
+    for (let i = 0; i < 4; i++) {
+      picks.push(MODELS[(modelIdx + i) % MODELS.length]);
+    }
+    modelIdx = (modelIdx + 4) % MODELS.length;
+
+    const result = await raceModels(picks, prompt, b64);
+    lastApiTime = Date.now();
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+    // Parse answer
+    const letter = (result.match(/ANSWER:\s*([A-D])/i) || [])[1] || '?';
+    const why = (result.match(/WHY:\s*(.+)/i) || [])[1] || '';
+
+    // Show big answer
+    showBigAnswer(letter, `${elapsed}s`);
+
+    // Add to stream
+    addAnswer(letter, why, elapsed);
+
+    // Stats
+    solvedCount++;
+    totalTime += parseFloat(elapsed);
+    $('countSolved').textContent = solvedCount;
+    $('avgSpeed').textContent = (totalTime / solvedCount).toFixed(1) + 's';
+
+    setStatus('watching', `✓ Réponse ${letter} en ${elapsed}s`, '');
+
+  } catch(err) {
+    $('answers').insertAdjacentHTML('afterbegin',
+      `<div class="ans-err">${esc(err.message)}</div>`);
+    setStatus('watching', 'Erreur — retry au prochain scan', '');
+    lastApiTime = Date.now(); // Still apply cooldown
+  }
+
+  analyzing = false;
+  prevFrame = null; // Reset detection after analysis
+}
+
+async function raceModels(models, prompt, b64) {
+  // Fire all in parallel, return first success
+  const controllers = models.map(() => new AbortController());
+
+  const promises = models.map((model, i) =>
+    fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      signal: controllers[i].signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': location.href,
+        'X-Title': 'ATPL Speed Solver'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }
+        ]}],
+        max_tokens: 100,
+        temperature: 0
+      })
+    })
+    .then(r => r.json())
+    .then(json => {
+      const txt = json.choices?.[0]?.message?.content;
+      if (!txt) throw new Error(json.error?.message || 'empty');
+      // Cancel other requests
+      controllers.forEach((c, j) => { if (j !== i) c.abort(); });
+      return txt;
+    })
+  );
+
+  // Use Promise.any — first successful response wins
+  try {
+    return await Promise.any(promises);
+  } catch(e) {
+    // All failed — collect errors
+    throw new Error('Tous les modèles ont échoué. Réessaie.');
+  }
+}
+
+// ═══════════════════════════════════════
+// FILE UPLOAD (manual)
+// ═══════════════════════════════════════
+function handleFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > IMG_MAX) { h = Math.round(h*IMG_MAX/w); w = IMG_MAX; } }
+      else { if (h > IMG_MAX) { w = Math.round(w*IMG_MAX/h); h = IMG_MAX; } }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const b64 = canvas.toDataURL('image/jpeg', IMG_QUALITY).split(',')[1];
+      manualAnalyze(b64);
+    };
+    img.src = ev.target.result;
+  };
+  r.readAsDataURL(f);
+}
+
+async function manualAnalyze(b64) {
+  if (analyzing) return;
+  analyzing = true;
+  const t0 = Date.now();
+  setStatus('api', 'Analyse...', '');
+
+  const prompt = `Look at this exam question photo. Give ONLY:
+1. The correct answer letter (A, B, C, or D)
+2. One short sentence why
+
+Format exactly:
+ANSWER: X
+WHY: ...`;
+
+  try {
+    const picks = MODELS.slice(0, 4);
+    const result = await raceModels(picks, prompt, b64);
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    const letter = (result.match(/ANSWER:\s*([A-D])/i) || [])[1] || '?';
+    const why = (result.match(/WHY:\s*(.+)/i) || [])[1] || '';
+    showBigAnswer(letter, `${elapsed}s`);
+    addAnswer(letter, why, elapsed);
+    solvedCount++;
+    totalTime += parseFloat(elapsed);
+    $('countSolved').textContent = solvedCount;
+    $('avgSpeed').textContent = (totalTime / solvedCount).toFixed(1) + 's';
+  } catch(err) {
+    $('answers').insertAdjacentHTML('afterbegin', `<div class="ans-err">${esc(err.message)}</div>`);
+  }
+  analyzing = false;
+  setStatus('idle', 'Prêt', '');
+}
+
+// ═══════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════
+function showBigAnswer(letter, sub) {
+  $('bigLetter').textContent = letter;
+  $('bigSub').textContent = sub;
+  const el = $('bigAnswer');
+  el.classList.remove('show');
+  void el.offsetWidth; // force reflow
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function addAnswer(letter, why, time) {
+  const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  $('answers').insertAdjacentHTML('afterbegin', `
+    <div class="ans">
+      <div class="ans-letter-sm">${letter}</div>
+      <div class="ans-text">${esc(why)}</div>
+      <div class="ans-time">${time}s · ${now}</div>
+    </div>`);
+  // Keep only last 30
+  const items = $('answers').children;
+  while (items.length > 30) items[items.length - 1].remove();
+}
+
+function setStatus(state, label, timer) {
+  const dot = $('sDot');
+  dot.className = 'status-dot ' + state;
+  $('sLabel').textContent = label;
+  $('sTimer').textContent = timer;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+$('overlay').addEventListener('click', startCam);
+</script>
+</body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ATPL Speed</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+:root{--bg:#070a10;--card:#111825;--accent:#00ffab;--dim:#00ffab15;--t1:#e4eaf2;--t2:#5d6e82;--border:#1a2536;--red:#ff3860;--warn:#ffaa00}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--t1);height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+
+#answerOverlay{position:fixed;top:0;left:0;right:0;z-index:200;text-align:center;padding:6px 12px;background:linear-gradient(180deg,#00ffab28,transparent 80%);pointer-events:none;opacity:0;transition:opacity .2s}
+#answerOverlay.show{opacity:1}
+#bigLetter{font-size:90px;font-weight:800;color:var(--accent);line-height:1;text-shadow:0 0 50px #00ffab50}
+#bigWhy{font-size:12px;color:var(--accent);opacity:.8;max-width:92vw;margin:4px auto 0;line-height:1.5;padding:0 8px}
+
+.bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.bar-left{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--t2);transition:background .3s}
+.dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.dot.scan{background:var(--warn);animation:spin .4s linear infinite}
+@keyframes spin{50%{transform:scale(1.6);opacity:.3}}
+.bar-label{font-size:11px;color:var(--t2)}
+.bar-label span{color:var(--accent)}
+.bar-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--t2);padding:3px 8px;font:10px 'JetBrains Mono',monospace;cursor:pointer}
+
+.cam-area{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
+.cam-area video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-area canvas{display:none}
+.scanline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);top:0;opacity:0;transition:opacity .2s}
+.scanline.on{opacity:1;animation:scanmove 1.5s ease-in-out infinite}
+@keyframes scanmove{0%{top:0}50%{top:100%}100%{top:0}}
+.c{position:absolute;width:14px;height:14px;border-color:var(--accent);border-style:solid;opacity:.4}
+.c1{top:8px;left:8px;border-width:2px 0 0 2px}.c2{top:8px;right:8px;border-width:2px 2px 0 0}
+.c3{bottom:8px;left:8px;border-width:0 0 2px 2px}.c4{bottom:8px;right:8px;border-width:0 2px 2px 0}
+.cam-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);gap:8px;transition:opacity .3s}
+.cam-overlay.hide{opacity:0;pointer-events:none}
+.cam-overlay span{font-size:12px;color:var(--t2)}
+
+.bottom{flex-shrink:0;padding:8px 12px;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.start-btn{width:100%;padding:14px;border:none;border-radius:10px;font:700 14px 'JetBrains Mono',monospace;cursor:pointer;background:var(--accent);color:var(--bg);transition:all .15s}
+.start-btn:active{transform:scale(.97)}
+.start-btn.running{background:var(--red)}
+
+.stream{display:flex;flex-direction:column;gap:4px;max-height:25vh;overflow-y:auto;scrollbar-width:thin}
+.stream-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px;font-size:11px;animation:slideIn .2s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(-6px)}}
+.stream-letter{font-size:20px;font-weight:800;color:var(--accent);min-width:24px;text-align:center}
+.stream-text{flex:1;color:var(--t2);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.stream-time{color:var(--t2);opacity:.4;font-size:9px;white-space:nowrap}
+.stream-err{color:var(--red);font-size:10px;padding:4px 8px;background:#ff386010;border-radius:4px}
+
+.setup-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+.setup-overlay.hide{display:none}
+.setup-box{max-width:360px;width:100%;display:flex;flex-direction:column;gap:14px}
+.setup-box h2{font-size:16px;font-weight:700}
+.setup-box p{font-size:11px;color:var(--t2);line-height:1.6}
+.setup-box a{color:var(--accent)}
+.setup-input{width:100%;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--t1);font:12px 'JetBrains Mono',monospace;outline:none}
+.setup-input:focus{border-color:var(--accent)}
+.setup-note{font-size:10px;color:var(--t2);line-height:1.5;padding:8px;background:var(--dim);border-radius:6px}
+</style>
+</head>
+<body>
+
+<div id="answerOverlay"><div id="bigLetter"></div><div id="bigWhy"></div></div>
+
+<div class="setup-overlay" id="setup">
+  <div class="setup-box">
+    <h2>ATPL Speed Solver</h2>
+    <p>Gemini 2.5 Flash — excellent OCR, ultra rapide, ~40 000 scans pour 25€</p>
+    <p>1. Va sur <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a><br>
+       2. Connecte-toi → active la facturation (25€ min)<br>
+       3. Crée une API key → colle-la ici</p>
+    <input class="setup-input" id="keyInput" placeholder="AIza..." autocomplete="off" spellcheck="false">
+    <button class="start-btn" onclick="saveKey()">Activer</button>
+    <div class="setup-note">💰 ~0.06¢ par scan. 25€ = ~40 000 scans. Mets un budget max dans AI Studio → Settings.</div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="bar-left">
+    <div class="dot" id="dot"></div>
+    <div class="bar-label" id="statusLabel">Prêt</div>
+  </div>
+  <div class="bar-right">
+    <div class="bar-label">Scans: <span id="countEl">0</span></div>
+    <button class="bar-btn" onclick="showSetup()">API</button>
+  </div>
+</div>
+
+<div class="cam-area">
+  <video id="vid" autoplay playsinline muted></video>
+  <canvas id="cvs"></canvas>
+  <div class="scanline" id="scanline"></div>
+  <div class="c c1"></div><div class="c c2"></div><div class="c c3"></div><div class="c c4"></div>
+  <div class="cam-overlay" id="camOverlay"><span>Appuie START</span></div>
+</div>
+
+<div class="bottom">
+  <div style="display:flex;gap:6px">
+    <button class="start-btn" id="mainBtn" onclick="toggleRun()" style="flex:1">START — HANDS FREE</button>
+    <button class="bar-btn" id="camBtn" onclick="cycleCamera()" style="display:none;padding:14px 12px;font-size:12px">📷</button>
+  </div>
+  <div class="stream" id="stream"></div>
+</div>
+
+<script>
+var INTERVAL = 4000;
+var CHANGE_THRESH = 4;
+var PX_SENS = 15;
+var THUMB = 96;
+var IMG_MAX = 1536;
+var IMG_Q = 0.8;
+var PAUSE_AFTER = 3000;
+
+var apiKey = localStorage.getItem('gem_k') || '';
+var running = false;
+var busy = false;
+var timer = null;
+var lastSentFrame = null;
+var count = 0;
+var camStream = null;
+var allBackCams = [];
+var currentCamIdx = 0;
+
+var vid = document.getElementById('vid');
+var cvs = document.getElementById('cvs');
+
+if (apiKey) document.getElementById('setup').classList.add('hide');
+
+function saveKey() {
+  var k = document.getElementById('keyInput').value.trim().replace(/[\s\u200B\u00A0]/g, '');
+  if (!k) return;
+  apiKey = k;
+  localStorage.setItem('gem_k', k);
+  document.getElementById('setup').classList.add('hide');
+}
+function showSetup() {
+  localStorage.removeItem('gem_k');
+  apiKey = '';
+  document.getElementById('setup').classList.remove('hide');
+  document.getElementById('keyInput').value = '';
+}
+
+async function toggleRun() {
+  if (running) return stopRun();
+  try {
+    if (camStream) camStream.getTracks().forEach(function(t) { t.stop(); });
+    var devices = await navigator.mediaDevices.enumerateDevices();
+    var backs = devices.filter(function(d) { return d.kind === 'videoinput' && (!d.label || !d.label.match(/front|avant|facetime/i)); });
+    if (backs.length === 0) backs = devices.filter(function(d) { return d.kind === 'videoinput'; });
+    allBackCams = backs;
+
+    var constraints;
+    var uw = backs.find(function(d) { return d.label && d.label.match(/ultra|wide|grand.?angle|0\.5/i) && !d.label.match(/tele/i); });
+    if (uw) constraints = { video: { deviceId: { exact: uw.deviceId }, width: { ideal: 1280 }, height: { ideal: 800 } } };
+    else if (backs.length > 1) constraints = { video: { deviceId: { exact: backs[1].deviceId }, width: { ideal: 1280 }, height: { ideal: 800 } } };
+    else constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 800 } } };
+
+    camStream = await navigator.mediaDevices.getUserMedia(constraints);
+    vid.srcObject = camStream;
+    document.getElementById('camOverlay').classList.add('hide');
+  } catch(e) {
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      vid.srcObject = camStream;
+      document.getElementById('camOverlay').classList.add('hide');
+    } catch(e2) {
+      setStatus('off', 'Caméra inaccessible');
+      return;
+    }
+  }
+  running = true;
+  lastSentFrame = null;
+  document.getElementById('mainBtn').textContent = 'STOP';
+  document.getElementById('mainBtn').classList.add('running');
+  document.getElementById('camBtn').style.display = 'block';
+  setStatus('on', 'Scan actif — hands free');
+  scanOnce();
+  timer = setInterval(scanOnce, INTERVAL);
+}
+
+function stopRun() {
+  running = false;
+  if (timer) { clearInterval(timer); timer = null; }
+  if (camStream) { camStream.getTracks().forEach(function(t) { t.stop(); }); camStream = null; }
+  document.getElementById('mainBtn').textContent = 'START — HANDS FREE';
+  document.getElementById('mainBtn').classList.remove('running');
+  document.getElementById('camBtn').style.display = 'none';
+  setStatus('off', 'Arrêté');
+}
+
+async function cycleCamera() {
+  if (!running || allBackCams.length < 2) return;
+  currentCamIdx = (currentCamIdx + 1) % allBackCams.length;
+  var cam = allBackCams[currentCamIdx];
+  try {
+    if (camStream) camStream.getTracks().forEach(function(t) { t.stop(); });
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cam.deviceId }, width: { ideal: 1280 }, height: { ideal: 800 } } });
+    vid.srcObject = camStream;
+    lastSentFrame = null;
+    setStatus('on', 'Caméra: ' + (cam.label || 'Cam ' + (currentCamIdx + 1)).substring(0, 25));
+  } catch(e) { setStatus('on', 'Changement échoué'); }
+}
+
+async function scanOnce() {
+  if (!running || busy || !vid.videoWidth) return;
+
+  var thumb = document.createElement('canvas');
+  thumb.width = THUMB; thumb.height = THUMB;
+  var tctx = thumb.getContext('2d', { willReadFrequently: true });
+  tctx.drawImage(vid, 0, 0, THUMB, THUMB);
+  var curFrame = tctx.getImageData(0, 0, THUMB, THUMB).data;
+
+  if (lastSentFrame) {
+    var diff = pixelDiff(lastSentFrame, curFrame);
+    if (diff < CHANGE_THRESH) {
+      setStatus('on', 'Même question (' + diff.toFixed(1) + '%)');
+      return;
+    }
+    setStatus('scan', 'Changement ' + diff.toFixed(0) + '% — analyse...');
+  } else {
+    setStatus('scan', 'Premier scan...');
+  }
+
+  busy = true;
+  document.getElementById('scanline').classList.add('on');
+  var t0 = performance.now();
+
+  var w = vid.videoWidth, h = vid.videoHeight;
+  var ratio = Math.min(IMG_MAX / w, IMG_MAX / h, 1);
+  w = Math.round(w * ratio); h = Math.round(h * ratio);
+  cvs.width = w; cvs.height = h;
+  cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
+  var b64 = cvs.toDataURL('image/jpeg', IMG_Q).split(',')[1];
+
+  try {
+    var text = await callGemini(b64);
+    var ms = Math.round(performance.now() - t0);
+    lastSentFrame = curFrame;
+
+    var letter = parseLetterFromText(text);
+    var whyM = text.match(/WHY:\s*(.+)/is) || text.match(/because\s+(.+)/is);
+    var why = whyM ? whyM[1].trim().substring(0, 250) : text.substring(0, 200);
+
+    showBig(letter, why);
+    addStream(letter, why, ms);
+    count++;
+    document.getElementById('countEl').textContent = count;
+    setStatus('on', '✓ ' + letter + ' — rentre ta réponse...');
+
+    await new Promise(function(r) { setTimeout(r, PAUSE_AFTER); });
+
+  } catch(e) {
+    addStreamErr(e.message);
+    setStatus('on', 'Erreur — retry...');
+  }
+
+  document.getElementById('scanline').classList.remove('on');
+  busy = false;
+}
+
+function parseLetterFromText(text) {
+  var patterns = [
+    /ANSWER:\s*([A-D])/i,
+    /\b([A-D])\s*(?:is|—|:|-)\s*(?:the\s+)?(?:correct|right|best)/i,
+    /(?:correct|right|best)\s*(?:answer|option)\s*(?:is|:)\s*([A-D])/i,
+    /\*\*([A-D])\*\*/,
+    /^([A-D])[\.\)\s:]/m
+  ];
+  for (var p = 0; p < patterns.length; p++) {
+    var m = text.match(patterns[p]);
+    if (m) return m[1];
+  }
+  var lr = text.match(/\b([A-D])\b/);
+  return lr ? lr[1] : '?';
+}
+
+// ═══════ GEMINI API ═══════
+async function callGemini(b64) {
+  var prompt = 'You are an expert ATPL Aviation English examiner (ICAO Level 6).\n\n' +
+    'Read the question and EVERY option A, B, C, D from the photo extremely carefully.\n\n' +
+    'Focus on:\n' +
+    '- Exact wording differences between options\n' +
+    '- Aviation phraseology and standard terminology\n' +
+    '- Idiomatic expressions and collocations\n' +
+    '- Grammar nuances (tenses, articles, prepositions)\n' +
+    '- ICAO/ATC specific vocabulary\n\n' +
+    'Think step by step. Analyze each option one by one before deciding.\n\n' +
+    'Reply EXACTLY in this format:\n' +
+    'ANSWER: X\n' +
+    'WHY: explanation';
+
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey;
+
+  var res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: 'image/jpeg', data: b64 } }
+        ]
+      }],
+      generationConfig: {
+        maxOutputTokens: 300,
+        temperature: 0.1
+      }
+    })
+  });
+
+  var json = await res.json();
+
+  if (!res.ok || json.error) {
+    throw new Error('Gemini ' + res.status + ': ' + (json.error ? json.error.message : JSON.stringify(json).substring(0, 200)));
+  }
+
+  var candidates = json.candidates;
+  if (!candidates || !candidates.length || !candidates[0].content || !candidates[0].content.parts) {
+    var reason = candidates && candidates[0] && candidates[0].finishReason;
+    throw new Error('Réponse vide (reason: ' + (reason || 'unknown') + ')');
+  }
+
+  var text = '';
+  var parts = candidates[0].content.parts;
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i].text) text += parts[i].text;
+  }
+  if (!text) throw new Error('Pas de texte dans la réponse');
+  return text;
+}
+
+function pixelDiff(a, b) {
+  var d = 0, n = a.length / 4;
+  for (var i = 0; i < a.length; i += 4) {
+    if ((Math.abs(a[i]-b[i]) + Math.abs(a[i+1]-b[i+1]) + Math.abs(a[i+2]-b[i+2])) / 3 > PX_SENS) d++;
+  }
+  return (d / n) * 100;
+}
+
+function showBig(letter, why) {
+  document.getElementById('bigLetter').textContent = letter;
+  document.getElementById('bigWhy').textContent = why;
+  var el = document.getElementById('answerOverlay');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(showBig._t);
+  showBig._t = setTimeout(function() { el.classList.remove('show'); }, 5000);
+}
+
+function addStream(letter, why, ms) {
+  var el = document.getElementById('stream');
+  var now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  el.insertAdjacentHTML('afterbegin',
+    '<div class="stream-item"><div class="stream-letter">' + letter +
+    '</div><div class="stream-text">' + esc(why) +
+    '</div><div class="stream-time">' + (ms/1000).toFixed(1) + 's · ' + now + '</div></div>');
+  while (el.children.length > 30) el.lastChild.remove();
+}
+
+function addStreamErr(msg) {
+  document.getElementById('stream').insertAdjacentHTML('afterbegin', '<div class="stream-err">' + esc(msg) + '</div>');
+}
+
+function setStatus(state, label) {
+  var dot = document.getElementById('dot');
+  dot.className = 'dot';
+  if (state === 'on') dot.classList.add('on');
+  else if (state === 'scan') dot.classList.add('scan');
+  document.getElementById('statusLabel').textContent = label;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.getElementById('camOverlay').addEventListener('click', toggleRun);
+</script>
+</body>
+</html>

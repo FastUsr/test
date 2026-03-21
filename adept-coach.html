@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ADEPT Coach</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+:root{--bg:#070a10;--card:#111825;--accent:#3b82f6;--accentL:#60a5fa;--dim:#3b82f615;--t1:#e4eaf2;--t2:#5d6e82;--border:#1a2536;--red:#ff3860;--green:#00e68a;--warn:#ffaa00}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--t1);height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Answer overlay */
+#answerOverlay{position:fixed;top:0;left:0;right:0;z-index:200;text-align:center;padding:8px 14px;background:linear-gradient(180deg,#3b82f630,transparent 85%);pointer-events:none;opacity:0;transition:opacity .2s}
+#answerOverlay.show{opacity:1}
+.ov-side{font-size:28px;font-weight:800;color:var(--accentL);line-height:1.1}
+.ov-degree{display:flex;justify-content:center;gap:6px;margin:6px 0}
+.ov-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--accentL);transition:all .2s}
+.ov-dot.fill{background:var(--accentL)}
+.ov-why{font-size:11px;color:var(--accentL);opacity:.8;max-width:92vw;margin:2px auto 0;line-height:1.4}
+
+.bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.bar-left{display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--t2);transition:background .3s}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.scan{background:var(--warn);animation:spin .4s linear infinite}
+@keyframes spin{50%{transform:scale(1.6);opacity:.3}}
+.bar-label{font-size:11px;color:var(--t2)}
+.bar-label span{color:var(--accentL)}
+.bar-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--t2);padding:3px 8px;font:10px 'JetBrains Mono',monospace;cursor:pointer}
+
+/* Buttons row */
+.btn-row{display:flex;gap:6px;padding:6px 12px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.start-btn{flex:1;padding:12px;border:none;border-radius:10px;font:700 13px 'JetBrains Mono',monospace;cursor:pointer;transition:all .15s}
+.start-btn:active{transform:scale(.97)}
+.btn-auto{background:var(--accent);color:#fff}
+.btn-auto.running{background:var(--red)}
+.btn-scan{background:#1e6bff;color:#fff}
+.btn-reset{background:none;border:1px solid var(--border);color:var(--t2);padding:12px 10px}
+
+.cam-area{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
+.cam-area video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-area canvas{display:none}
+.scanline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);top:0;opacity:0;transition:opacity .2s}
+.scanline.on{opacity:1;animation:scanmove 1.5s ease-in-out infinite}
+@keyframes scanmove{0%{top:0}50%{top:100%}100%{top:0}}
+.cam-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);gap:8px;transition:opacity .3s}
+.cam-overlay.hide{opacity:0;pointer-events:none}
+.cam-overlay span{font-size:12px;color:var(--t2)}
+
+.bottom{flex-shrink:0;padding:8px 12px;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px;max-height:35vh;overflow-y:auto}
+.stream-item{display:flex;align-items:flex-start;gap:8px;padding:8px;background:var(--bg);border-radius:6px;font-size:11px;animation:slideIn .2s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(-6px)}}
+.si-side{font-size:14px;font-weight:800;color:var(--accentL);min-width:20px}
+.si-dots{display:flex;gap:3px;flex-shrink:0;padding-top:2px}
+.si-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--accentL)}
+.si-dot.f{background:var(--accentL)}
+.si-text{flex:1;color:var(--t2);line-height:1.3}
+.si-time{color:var(--t2);opacity:.4;font-size:9px;white-space:nowrap}
+.stream-err{color:var(--red);font-size:10px;padding:4px 8px;background:#ff386010;border-radius:4px}
+
+/* Consistency indicator */
+.consist{font-size:10px;color:var(--t2);padding:4px 8px;text-align:center}
+.consist span{color:var(--green)}
+
+.setup-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+.setup-overlay.hide{display:none}
+.setup-box{max-width:380px;width:100%;display:flex;flex-direction:column;gap:14px}
+.setup-box h2{font-size:16px;font-weight:700}
+.setup-box p{font-size:11px;color:var(--t2);line-height:1.6}
+.setup-box a{color:var(--accentL)}
+.setup-input{width:100%;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--t1);font:12px 'JetBrains Mono',monospace;outline:none}
+.setup-input:focus{border-color:var(--accent)}
+.setup-note{font-size:10px;color:var(--t2);line-height:1.5;padding:8px;background:var(--dim);border-radius:6px}
+</style>
+</head>
+<body>
+
+<div id="answerOverlay">
+  <div class="ov-side" id="ovSide"></div>
+  <div class="ov-degree" id="ovDots"></div>
+  <div class="ov-why" id="ovWhy"></div>
+</div>
+
+<div class="setup-overlay" id="setup">
+  <div class="setup-box">
+    <h2>ADEPT-15 Coach</h2>
+    <p>Coach personnalité temps réel pour test ADEPT pilote Ryanair.</p>
+    <p>Utilise ta clé Gemini existante :</p>
+    <input class="setup-input" id="keyInput" placeholder="AIza..." autocomplete="off" spellcheck="false">
+    <button class="start-btn btn-auto" onclick="saveKey()">Activer</button>
+    <div class="setup-note">Scanne les paires d'affirmations → le coach te dit quel côté + à quel degré. Il maintient la cohérence sur toute la session.</div>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="bar-left">
+    <div class="dot" id="dot"></div>
+    <div class="bar-label" id="statusLabel">Prêt</div>
+  </div>
+  <div class="bar-right">
+    <div class="bar-label">Q: <span id="countEl">0</span></div>
+    <button class="bar-btn" onclick="showSetup()">API</button>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button class="start-btn btn-auto" id="mainBtn" onclick="toggleRun()">AUTO</button>
+  <button class="start-btn btn-scan" id="scanBtn" onclick="manualScan()">SCAN</button>
+  <button class="start-btn btn-reset" onclick="resetSession()">↺</button>
+  <button class="bar-btn" id="camBtn" onclick="cycleCamera()" style="display:none;padding:12px;font-size:12px">📷</button>
+</div>
+
+<div class="cam-area">
+  <video id="vid" autoplay playsinline muted></video>
+  <canvas id="cvs"></canvas>
+  <div class="scanline" id="scanline"></div>
+  <div class="cam-overlay" id="camOverlay"><span>SCAN ou AUTO pour démarrer</span></div>
+</div>
+
+<div class="bottom">
+  <div class="consist" id="consist"></div>
+  <div id="stream"></div>
+</div>
+
+<script>
+var INTERVAL = 5000;
+var CHANGE_THRESH = 4;
+var PX_SENS = 15;
+var THUMB = 96;
+var IMG_MAX = 1920;
+var IMG_Q = 0.85;
+var PAUSE_AFTER = 5000;
+
+var apiKey = localStorage.getItem('gem_k') || '';
+var running = false;
+var busy = false;
+var timer = null;
+var lastSentFrame = null;
+var count = 0;
+var camStream = null;
+var allBackCams = [];
+var currentCamIdx = 0;
+
+// Session history for consistency
+var sessionHistory = [];
+
+var vid = document.getElementById('vid');
+var cvs = document.getElementById('cvs');
+
+if (apiKey) document.getElementById('setup').classList.add('hide');
+
+// ═══════ RYANAIR FO PERSONALITY PROFILE ═══════
+var SYSTEM_PROMPT = `TASK: You are looking at a personality test screenshot. There are exactly TWO statements on screen (A on the left, B on the right). The candidate must choose which describes them better.
+
+STEP 1 — READ BOTH STATEMENTS:
+Copy statement A and statement B word for word from the screenshot. Read them carefully before answering.
+
+STEP 2 — IDENTIFY TRAITS:
+Each statement maps to a personality trait. Common mappings:
+- Checking work, proofreading, double-checking = ATTENTION TO DETAIL / CONSCIENTIOUSNESS
+- Creative ideas, innovation, new approaches = CREATIVITY / INNOVATION  
+- Following rules, procedures, guidelines = RULE-FOLLOWING / CONFORMITY
+- Working with others, team harmony = COOPERATION / TEAMWORK
+- Taking charge, leading, deciding = DOMINANCE / LEADERSHIP
+- Staying calm, handling pressure = COMPOSURE / STRESS TOLERANCE
+- Taking risks, trying new things = RISK-TAKING / ADVENTUROUSNESS
+- Working alone, independent = AUTONOMY / INDEPENDENCE
+- Caring about others feelings = SENSITIVITY / EMPATHY
+- Being organized, planning ahead = ORDERLINESS / STRUCTURE
+- Being sociable, outgoing = SOCIABILITY / EXTRAVERSION
+- Wanting to succeed, compete = ACHIEVEMENT / AMBITION
+
+STEP 3 — DECIDE USING THESE PRIORITY RULES FOR A RYANAIR FIRST OFFICER:
+
+ALWAYS PICK (FORT):
+- Attention to detail, thoroughness, checking work > creativity, spontaneity
+- Following rules, SOPs, procedures > innovation, new approaches
+- Team cooperation, supporting others > working alone, independence
+- Staying calm, composed > being emotional, reactive
+- Being organized, structured > being flexible, improvising
+- Being cautious, safe > taking risks, being adventurous
+
+USUALLY PICK (MODERE):
+- Being reliable, dependable > being exciting, spontaneous
+- Planning ahead > going with the flow
+- Respecting authority > challenging authority
+- Being methodical > being intuitive
+
+SLIGHT LEAN (LEGER):
+- Being friendly, sociable > being reserved (slight lean toward sociable)
+- Being ambitious > being content (slight lean toward ambitious)
+- Being empathetic > being detached (slight lean toward empathetic)
+
+REMEMBER: A pilot who checks their messages carefully = a pilot who checks their checklists. ALWAYS favor thoroughness, precision, rule-following, and attention to detail over creativity, spontaneity, or risk-taking.`;
+
+var RESPONSE_FORMAT = `
+
+RESPOND EXACTLY LIKE THIS:
+A: [copy statement A word for word]
+B: [copy statement B word for word]
+PICK: A or B
+STRENGTH: LEGER or MODERE or FORT
+TRAIT: [what personality dimension is being measured for each statement]
+WHY: [one sentence why this choice fits a Ryanair FO]`;
+
+function getPromptWithHistory() {
+  var historyStr = '';
+  if (sessionHistory.length > 0) {
+    historyStr = '\n\nPREVIOUS ANSWERS THIS SESSION — stay consistent:\n';
+    for (var i = 0; i < sessionHistory.length; i++) {
+      var h = sessionHistory[i];
+      historyStr += 'Q' + (i + 1) + '. ' + h.dimension + ' → ' + h.side + ' (' + h.strength + ')\n';
+    }
+    historyStr += '\nDo not contradict the pattern above.\n';
+  }
+  return SYSTEM_PROMPT + historyStr + RESPONSE_FORMAT;
+}
+
+// ═══════ SETUP ═══════
+function saveKey() {
+  var k = document.getElementById('keyInput').value.trim().replace(/[\s\u200B\u00A0]/g, '');
+  if (!k) return;
+  apiKey = k;
+  localStorage.setItem('gem_k', k);
+  document.getElementById('setup').classList.add('hide');
+}
+function showSetup() {
+  localStorage.removeItem('gem_k');
+  apiKey = '';
+  document.getElementById('setup').classList.remove('hide');
+  document.getElementById('keyInput').value = '';
+}
+function resetSession() {
+  sessionHistory = [];
+  count = 0;
+  document.getElementById('countEl').textContent = '0';
+  document.getElementById('stream').innerHTML = '';
+  document.getElementById('consist').textContent = '';
+  lastSentFrame = null;
+  setStatus('on', 'Session réinitialisée');
+}
+
+// ═══════ CAMERA ═══════
+async function startCameraIfNeeded() {
+  if (camStream && vid.videoWidth) return true;
+  try {
+    if (camStream) camStream.getTracks().forEach(function(t) { t.stop(); });
+    var devices = await navigator.mediaDevices.enumerateDevices();
+    var backs = devices.filter(function(d) { return d.kind === 'videoinput' && (!d.label || !d.label.match(/front|avant|facetime/i)); });
+    if (backs.length === 0) backs = devices.filter(function(d) { return d.kind === 'videoinput'; });
+    allBackCams = backs;
+    var uw = backs.find(function(d) { return d.label && d.label.match(/ultra|wide|grand.?angle|0\.5/i) && !d.label.match(/tele/i); });
+    var constraints;
+    if (uw) constraints = { video: { deviceId: { exact: uw.deviceId }, width: { ideal: 1280 }, height: { ideal: 800 } } };
+    else if (backs.length > 1) constraints = { video: { deviceId: { exact: backs[1].deviceId }, width: { ideal: 1280 }, height: { ideal: 800 } } };
+    else constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 800 } } };
+    camStream = await navigator.mediaDevices.getUserMedia(constraints);
+    vid.srcObject = camStream;
+    document.getElementById('camOverlay').classList.add('hide');
+    document.getElementById('camBtn').style.display = 'block';
+    await new Promise(function(r) { vid.onloadeddata = r; setTimeout(r, 1000); });
+    return true;
+  } catch(e) {
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      vid.srcObject = camStream;
+      document.getElementById('camOverlay').classList.add('hide');
+      await new Promise(function(r) { vid.onloadeddata = r; setTimeout(r, 1000); });
+      return true;
+    } catch(e2) {
+      setStatus('off', 'Caméra inaccessible');
+      return false;
+    }
+  }
+}
+
+async function cycleCamera() {
+  if (allBackCams.length < 2) return;
+  currentCamIdx = (currentCamIdx + 1) % allBackCams.length;
+  var cam = allBackCams[currentCamIdx];
+  try {
+    if (camStream) camStream.getTracks().forEach(function(t) { t.stop(); });
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cam.deviceId }, width: { ideal: 1280 }, height: { ideal: 800 } } });
+    vid.srcObject = camStream;
+    lastSentFrame = null;
+    setStatus('on', 'Cam: ' + (cam.label || 'Cam ' + (currentCamIdx + 1)).substring(0, 25));
+  } catch(e) { setStatus('on', 'Changement échoué'); }
+}
+
+// ═══════ AUTO MODE ═══════
+async function toggleRun() {
+  if (running) return stopRun();
+  if (!(await startCameraIfNeeded())) return;
+  running = true;
+  lastSentFrame = null;
+  document.getElementById('mainBtn').textContent = 'STOP';
+  document.getElementById('mainBtn').classList.add('running');
+  setStatus('on', 'Auto actif');
+  doScan();
+  timer = setInterval(doScan, INTERVAL);
+}
+function stopRun() {
+  running = false;
+  if (timer) { clearInterval(timer); timer = null; }
+  document.getElementById('mainBtn').textContent = 'AUTO';
+  document.getElementById('mainBtn').classList.remove('running');
+  setStatus('on', 'Auto arrêté');
+}
+
+// ═══════ MANUAL SCAN ═══════
+async function manualScan() {
+  if (busy) return;
+  if (!(await startCameraIfNeeded())) return;
+  lastSentFrame = null; // Force scan
+  await doScan();
+}
+
+// ═══════ SCAN CORE ═══════
+async function doScan() {
+  if (busy || !vid.videoWidth) return;
+
+  var thumb = document.createElement('canvas');
+  thumb.width = THUMB; thumb.height = THUMB;
+  var tctx = thumb.getContext('2d', { willReadFrequently: true });
+  tctx.drawImage(vid, 0, 0, THUMB, THUMB);
+  var curFrame = tctx.getImageData(0, 0, THUMB, THUMB).data;
+
+  if (lastSentFrame) {
+    var diff = pixelDiff(lastSentFrame, curFrame);
+    if (diff < CHANGE_THRESH) {
+      setStatus('on', 'Même question (' + diff.toFixed(1) + '%)');
+      return;
+    }
+  }
+
+  busy = true;
+  setStatus('scan', 'Analyse...');
+  document.getElementById('scanline').classList.add('on');
+  var t0 = performance.now();
+
+  var w = vid.videoWidth, h = vid.videoHeight;
+  var ratio = Math.min(IMG_MAX / w, IMG_MAX / h, 1);
+  w = Math.round(w * ratio); h = Math.round(h * ratio);
+  cvs.width = w; cvs.height = h;
+  cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
+  var b64 = cvs.toDataURL('image/jpeg', IMG_Q).split(',')[1];
+
+  try {
+    var text = await callGemini(b64);
+    var ms = Math.round(performance.now() - t0);
+    lastSentFrame = curFrame;
+
+    var result = parseResult(text);
+
+    // Save to history
+    sessionHistory.push({
+      side: result.side,
+      strength: result.strength,
+      dimension: result.dimension,
+      why: result.why
+    });
+
+    showOverlay(result);
+    addStream(result, ms);
+    count++;
+    document.getElementById('countEl').textContent = count;
+    updateConsistency();
+    setStatus('on', '✓ ' + result.side + ' · ' + result.strength + ' — rentre ta réponse...');
+
+    if (running) await new Promise(function(r) { setTimeout(r, PAUSE_AFTER); });
+
+  } catch(e) {
+    addStreamErr(e.message);
+    setStatus('on', 'Erreur');
+  }
+
+  document.getElementById('scanline').classList.remove('on');
+  busy = false;
+}
+
+// ═══════ PARSE RESULT ═══════
+function parseResult(text) {
+  var side = '?';
+  var strength = 'MODERE';
+  var dimension = '?';
+  var why = '';
+  var stmtA = '';
+  var stmtB = '';
+
+  // Extract statements
+  var aM = text.match(/^A:\s*(.+?)$/im);
+  if (aM) stmtA = aM[1].trim().substring(0, 120);
+
+  var bM = text.match(/^B:\s*(.+?)$/im);
+  if (bM) stmtB = bM[1].trim().substring(0, 120);
+
+  // Extract pick
+  var pickM = text.match(/PICK:\s*(A|B)/i);
+  if (pickM) side = pickM[1].toUpperCase();
+
+  // Extract strength
+  var strM = text.match(/STRENGTH:\s*(LEGER|MODERE|FORT|LÉGER|MODÉRÉ)/i);
+  if (strM) strength = strM[1].toUpperCase().replace('LÉGER','LEGER').replace('MODÉRÉ','MODERE');
+
+  // Extract dimension
+  var dimM = text.match(/TRAIT:\s*(.+?)(?:\n|$)/i);
+  if (!dimM) dimM = text.match(/DIMENSION:\s*(.+?)(?:\n|$)/i);
+  if (dimM) dimension = dimM[1].trim().substring(0, 40);
+
+  // Extract reason
+  var whyM = text.match(/WHY:\s*(.+?)(?:\n|$)/is);
+  if (!whyM) whyM = text.match(/REASON:\s*(.+?)(?:\n|$)/is);
+  if (whyM) why = whyM[1].trim().substring(0, 200);
+
+  return { side: side, strength: strength, dimension: dimension, why: why, stmtA: stmtA, stmtB: stmtB };
+}
+
+// ═══════ GEMINI API ═══════
+async function callGemini(b64) {
+  var prompt = getPromptWithHistory();
+
+  var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: 'image/jpeg', data: b64 } }
+        ]
+      }],
+      generationConfig: { maxOutputTokens: 500, temperature: 0.2 }
+    })
+  });
+
+  var json = await res.json();
+  if (!res.ok || json.error) {
+    var msg = json.error ? json.error.message : 'Unknown';
+    if (res.status === 429 || msg.indexOf('quota') !== -1) msg = 'Quota — active la facturation dans AI Studio';
+    throw new Error(msg);
+  }
+
+  var candidates = json.candidates;
+  if (!candidates || !candidates.length || !candidates[0].content || !candidates[0].content.parts) {
+    throw new Error('Réponse vide');
+  }
+
+  var text = '';
+  var parts = candidates[0].content.parts;
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i].text) text += parts[i].text;
+  }
+  return text;
+}
+
+// ═══════ UI ═══════
+function showOverlay(r) {
+  var strengthColors = { LEGER: '#60a5fa', MODERE: '#f59e0b', FORT: '#ef4444' };
+  var strengthLabels = { LEGER: 'Léger', MODERE: 'Modéré', FORT: 'Fort' };
+  var color = strengthColors[r.strength] || '#60a5fa';
+  var label = strengthLabels[r.strength] || r.strength;
+
+  var pickedStmt = r.side === 'A' ? r.stmtA : r.stmtB;
+
+  document.getElementById('ovSide').innerHTML = '<span style="font-size:40px">' + r.side + '</span>';
+  document.getElementById('ovDots').innerHTML = '<div style="display:inline-block;padding:4px 14px;border-radius:20px;background:' + color + '22;border:2px solid ' + color + ';color:' + color + ';font-size:14px;font-weight:700">' + label + '</div>';
+
+  var whyText = '';
+  if (pickedStmt) whyText += '"' + pickedStmt + '"\n';
+  if (r.dimension !== '?') whyText += r.dimension;
+  if (r.why) whyText += ' — ' + r.why;
+  document.getElementById('ovWhy').textContent = whyText;
+
+  var el = document.getElementById('answerOverlay');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(showOverlay._t);
+  showOverlay._t = setTimeout(function() { el.classList.remove('show'); }, 8000);
+}
+
+function addStream(r, ms) {
+  var el = document.getElementById('stream');
+  var now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var strengthColors = { LEGER: '#60a5fa', MODERE: '#f59e0b', FORT: '#ef4444' };
+  var strengthLabels = { LEGER: 'Lég.', MODERE: 'Mod.', FORT: 'Fort' };
+  var color = strengthColors[r.strength] || '#60a5fa';
+  var label = strengthLabels[r.strength] || '?';
+
+  var pickedStmt = r.side === 'A' ? r.stmtA : r.stmtB;
+  var textContent = '<b>' + esc(r.dimension) + '</b>';
+  if (pickedStmt) textContent += '<br>"' + esc(pickedStmt) + '"';
+  if (r.why) textContent += '<br>' + esc(r.why);
+
+  el.insertAdjacentHTML('afterbegin',
+    '<div class="stream-item">' +
+    '<div class="si-side" style="font-size:18px">' + r.side + '</div>' +
+    '<div style="flex-shrink:0;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;color:' + color + ';border:1px solid ' + color + '">' + label + '</div>' +
+    '<div class="si-text">' + textContent + '</div>' +
+    '<div class="si-time">' + (ms/1000).toFixed(1) + 's · ' + now + '</div></div>');
+  while (el.children.length > 40) el.lastChild.remove();
+}
+
+function addStreamErr(msg) {
+  document.getElementById('stream').insertAdjacentHTML('afterbegin', '<div class="stream-err">' + esc(msg) + '</div>');
+}
+
+function updateConsistency() {
+  var dims = {};
+  for (var i = 0; i < sessionHistory.length; i++) {
+    var h = sessionHistory[i];
+    if (!dims[h.dimension]) dims[h.dimension] = [];
+    dims[h.dimension].push(h.side);
+  }
+  var consistent = 0, total = 0;
+  for (var d in dims) {
+    if (dims[d].length > 1) {
+      total++;
+      var allSame = dims[d].every(function(s) { return s === dims[d][0]; });
+      if (allSame) consistent++;
+    }
+  }
+  if (total > 0) {
+    document.getElementById('consist').innerHTML = 'Cohérence: <span>' + consistent + '/' + total + '</span> dimensions stables · ' + sessionHistory.length + ' réponses';
+  } else {
+    document.getElementById('consist').textContent = sessionHistory.length + ' réponse(s)';
+  }
+}
+
+function setStatus(state, label) {
+  var dot = document.getElementById('dot');
+  dot.className = 'dot';
+  if (state === 'on') dot.classList.add('on');
+  else if (state === 'scan') dot.classList.add('scan');
+  document.getElementById('statusLabel').textContent = label;
+}
+
+function pixelDiff(a, b) {
+  var d = 0, n = a.length / 4;
+  for (var i = 0; i < a.length; i += 4) {
+    if ((Math.abs(a[i]-b[i]) + Math.abs(a[i+1]-b[i+1]) + Math.abs(a[i+2]-b[i+2])) / 3 > PX_SENS) d++;
+  }
+  return (d / n) * 100;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.getElementById('camOverlay').addEventListener('click', manualScan);
+</script>
+</body>
+</html>
